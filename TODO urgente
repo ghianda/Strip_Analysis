@@ -1,0 +1,6 @@
+di default chiama anche BETA (creazione sezioni)
+toglierlo dall'esecuzione di default (prende un sacco di tempo ed è inutile)
+-fatto
+
+
+modificare structural_analysis e decommentare fase beta (se serviranno le proiezioni in sezione) oppure modificarlo per prenderla come opzione in input

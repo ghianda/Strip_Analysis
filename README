@@ -1,0 +1,14 @@
+programma principale (3 step consecutivi):
+
+ - ALFA_volume_analysis - first step (clahe, segmentation, volume estimation ecc) 
+
+ - BETA_estimated_section - use mask_bin for section estimation
+
+ - GAMMA_orientation_analysis - use segmented for 3d fourier analysis
+ 
+ 
+ inoltre, posso usare
+ 
+ CLAHE - esegue il clahe sulle immagini nella cartella di origine e le salva nela destinazione fornita
+ 
+ segment_by_masks - fa l'AND fra le due cartelle fornite e salve i risultati in dest fornita
