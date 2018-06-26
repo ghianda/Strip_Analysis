@@ -71,8 +71,16 @@ def structural_analysis(parser):
     os.system('python3 GAMMA_orientation_analysis.py -sf {}'.format(segmented_path))
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='primary test desc')
-    parser.add_argument('-sf', '--source_folder', nargs='+', required=False)
+def main():
+    parser = argparse.ArgumentParser(
+        description='Strip images enhanced and 3D Structural analysis',
+        epilog='Author: Francesco Giardini <giardini@lens.unifi.it>',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('-sf', '--source_folder', nargs='+', required=False, help='input images path')
     structural_analysis(parser)
+
+if __name__ == '__main__':
+    main()
+
 
