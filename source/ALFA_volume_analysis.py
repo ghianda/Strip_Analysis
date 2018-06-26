@@ -21,21 +21,6 @@ def main(parser):
     args = parser.parse_args()
     source_path = manage_path_argument(args.source_folder)
 
-    # source_path = args.source_folder
-    #
-    # if type(source_path) is list:
-    #     if len(source_path) > 1:
-    #         given_path = ' '.join(source_path)
-    #         source_path = [given_path]  # prepare source_path for 'load_stack_into_numpy_ndarray' function (it takes a list in input)
-    #     else:
-    #         given_path = source_path[0]
-    # else:
-    #     given_path = source_path
-
-    # # remove last backlslash
-    # if given_path.endswith('/'):
-    #     given_path = given_path[0:-1]
-
     # take base path and stack name
     base_path = os.path.dirname(os.path.dirname(source_path))
     stack_name = os.path.basename(source_path)
@@ -90,13 +75,6 @@ def main(parser):
 
     # extract stack
     volume, mess = load_stack_into_numpy_ndarray([source_path])
-    
-    # source_data = make_dataset(source_path)
-    # data_length = len(source_data)
-
-    # volume = create_stack_light(source_data)
-    # del source_data
-
     img_shape = volume[:, :, 0].shape
 
     print(mess)
@@ -149,8 +127,9 @@ def main(parser):
                     contours = create_surrounded_images(bw_mask, equalized_img, img_name, destination_paths[3], _save=_save_countourned)
 
                     if _save_contours:
-	                    # save image with only contours for fiji visualization:
-	                    save_contours(img_name, contours, bw_mask.shape, destination_paths[4])
+                        # save image with only contours for fiji visualization:
+                        save_contours(img_name, contours, bw_mask.shape, destination_paths[4])
+                        save_contours(img_name, contours, bw_mask.shape, destination_paths[4])
 
                     slice_elab_time_list.append(time.time() - elab_start)            
                     elapsed_time = (number_of_slices - z - 1) * np.mean(slice_elab_time_list)

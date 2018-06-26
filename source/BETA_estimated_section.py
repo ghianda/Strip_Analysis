@@ -14,24 +14,8 @@ def main(parser):
     # read args from console
     args = parser.parse_args()
 
-    source_path = manage_path_argument(args.source_folder)
-
-    # source_path = args.source_folder
-
-    # if type(source_path) is list:
-    #     if len(source_path) > 1:
-    #         given_path = ' '.join(source_path)
-    #         source_path = [given_path]  # prepare source_path for 'make_dataset' function (it takes a list in input)
-    #     else:
-    #         given_path = source_path[0]
-    # else:
-    #     given_path = source_path
-
-    # # remove last backlslash
-    # if given_path.endswith('/'):
-    #     given_path = given_path[0:-1]
-
     # take base path and stack name
+    source_path = manage_path_argument(args.source_folder)
     base_path = os.path.dirname(os.path.dirname(source_path))
     stack_name = os.path.basename(source_path)
 
@@ -39,13 +23,14 @@ def main(parser):
     txt_parameters_path = os.path.join(base_path, 'parameters.txt')
     txt_results_path = os.path.join(base_path, 'BETA_section_results.txt')
 
-    # create paths for load masked images
-    # mask_path = os.path.join(base_path, 'mask_bin', stack_name)
+    # reads parameters
+    parameters = extract_parameters(txt_parameters_path)
 
-    # create path and folder where save section images
-    sections_path = os.path.join(base_path, 'xz_sections', stack_name)
-    if not os.path.exists(sections_path):
-        os.makedirs(sections_path)
+    if parameters['save_binary_sections']:
+        # create path and folder where save section images
+        sections_path = os.path.join(base_path, 'xz_sections', stack_name)
+        if not os.path.exists(sections_path):
+            os.makedirs(sections_path)
 
     # SCRIPT -----------------------------------------
 
@@ -61,30 +46,15 @@ def main(parser):
             print(line)
             f.write(line+'\n')
 
-    # reads parameters
-    parameters = extract_parameters(txt_parameters_path)
-
     # measure units
     x_step = parameters['res_xy']  # micron
-    y_step = parameters['res_xy']  # micron
     z_step = parameters['res_z']  # micron
-    pixel_xz_in_micron2 = x_step * z_step  # micron^2
+    pixel_xz_in_micron2 = x_step * z_step  # micron^2, sections(y) are XZ projections
 
     # create images stack from source path
     print(' *** Start to load the Stack...')
     masks, mess = load_stack_into_numpy_ndarray([source_path])
     print(mess)
-    # source_data = make_dataset(source_path)
-    # data_length = len(source_data)
-
-    # masks = create_stack_light(source_data)
-
-    # if data_length == masks.shape[2]:
-    #     print(' Stack loaded successfully')
-    # else:
-    #     print(' *** WARNING -> len(image_list) != slices in ndarray -> check loading')
-
-    # del source_data
 
     number_of_sections = masks.shape[0]  # row -> y -> number of sections
     print('number_of_sections', number_of_sections)
@@ -115,8 +85,9 @@ def main(parser):
                     section = np.rot90(m=section, k=1, axes=(0,1))
                     section = np.flipud(section)
 
-                    # save image of section
-                    save_tiff(img=section, img_name=sec_name, comment='section', folder_path=sections_path)
+                    if parameters['save_binary_sections']:
+                        # save image of section
+                        save_tiff(img=section, img_name=sec_name, comment='section', folder_path=sections_path)
                 
                 else:
                     measure = ' - {} is empty'.format(sec_name)
@@ -163,7 +134,8 @@ def extract_parameters(filename):
     and save it in a dictionary'''
 
     param_names = ['res_xy',
-                   'res_z']
+                   'res_z',
+                   'save_binary_sections']
 
     # read values in txt
     param_values = search_value_in_txt(filename, param_names)

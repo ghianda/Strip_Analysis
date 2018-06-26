@@ -24,26 +24,10 @@ def structural_analysis(parser):
     print('\n')
 
     args = parser.parse_args()
-    
+
+    # extract path string
     source_path = manage_path_argument(args.source_folder)
     source_path = source_path.replace(' ', '\ ')  # correct whitespace with backslash
-
-
-    #source_path = args.source_folder
-    #
-    # if type(source_path) is list:
-    #     if len(source_path) > 1:
-    #         source_path = ' '.join(source_path)
-    #         # source_path = [given_path]  # prepare source_path for 'load_stack_into_numpy_ndarray' function (it takes a list in input)
-    #     else:
-    #         source_path = source_path[0]
-
-    # # correct whitespace with backslash
-    # source_path = source_path.replace(' ', '\ ')
-
-    # # extract base path
-    # if source_path.endswith('/'):
-    #     source_path = source_path[0:-1]
 
     # extract base path and stack name
     base_path = os.path.dirname(os.path.dirname(source_path))
@@ -51,33 +35,39 @@ def structural_analysis(parser):
 
     # create folder path of binary mask images
     mask_path = os.path.join(base_path, 'mask_bin', stack_name)
-    # mask_path = mask_path.replace(' ', '\ ')  # correct white space ' '  with '\ '
 
     # create folder path of segmented images
     segmented_path = os.path.join(base_path, 'segmented', stack_name)
-    # segmented_path = segmented_path.replace(' ', '\ ')  # correct white space ' '  with '\ '
 
     # call  ALFA_volume_analysis script
-    print(' ---------> call ALFA')
+    #print(' ---------> call ALFA')
     os.system('python3 ALFA_volume_analysis.py -sf {}'.format(source_path))
 
     # call  BETA_estimated_section script
-    # todo renderlo opzionale con input d'ingresso
-    print(' ---------> call BETA')
+    #print(' ---------> call BETA')
     os.system('python3 BETA_estimated_section.py -sf {}'.format(mask_path))
 
     # call  ALFA_volume_analysis script
-    print(' ---------> call GAMMA')
+    #print(' ---------> call GAMMA')
     os.system('python3 GAMMA_orientation_analysis.py -sf {}'.format(segmented_path))
 
 
 def main():
+
+    # define parser
     parser = argparse.ArgumentParser(
         description='Strip images enhanced and 3D Structural analysis',
         epilog='Author: Francesco Giardini <giardini@lens.unifi.it>',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
+    # command line REQUIRED argument
     parser.add_argument('-sf', '--source_folder', nargs='+', required=False, help='input images path')
+
+    # command line OPTIONAL argument, passed without value (if passed '--ss', args.save_sections is True, else False)
+    parser.add_argument('--ss', action='store_true', dest='save_sections', help='save binary sections images on disk')
+    # NOTE - THIS IS A TEST -> SCRIPT NOT USE -ss OPTION, BUT READ parameters.txt FILE
+
+    # run analyis
     structural_analysis(parser)
 
 if __name__ == '__main__':
