@@ -1,0 +1,46 @@
+Protocollo per analisi strutturale strip
+
+Stack ottenuti con il due fotoni presenti su cuoricino.
+
+
+1) [by tesla da remoto] conversione singoli stack (cartelle di frame) in file TIFF 3D con script giacomo - eventualmente selezionare canale RED (-c 0)
+
+2) [by tesla remoto] stitching
+
+		stitch-align --iX --px-size-xy 1.152 --px-size-z 5 --overlap-h 120 --overlap-v 120 --dx 30 --dy 30 --dz 20 --z-samples 20 --z-stride 20 .
+		stitch-fuse -o fused.tiff .
+
+1) aprire file sticciato con imagej
+- assicurarsi che sia 1 solo canale (8 bit)
+- cropparlo a mano eliminando il nero superfluo (riduce spazio e tempo di esecuzione)
+- se la strip è palesemente non allineata in verticale:
+-- tracciare linea lungo l'asse della fibra
+-- leggere angolo della retta
+-- ruotare l'immagine di quell'angolo per raddrizzarla
+-- salvare
+
+ATTENZIONE: in ogni caso, l'asse principale delle immagini della strip dev'essere verticale, non orizzontale.
+
+2) [by Huygens] DECONVOLUZIONE
+- caricare volume 3d e psf stimata dello strumento
+- deconvolvere e salvare su cuoricino
+
+3) assicurarsi che il file tiff3d deconvolto sia in un percorso del tipo:
+ nome_campione/deconv/file3d.tiff
+
+4) ** NOTA BENE - il programma apre anche elenco di frame
+l'elenco dei file sarà quindi in
+nome_campione/deconv/stitched_stack/
+
+2) aprire terminale
+- spostarsi in  /home/francesco/PycharmProjects/Structural_Analysis/source/
+- eseguire python3 structural_analysis -sf percorso_file
+
+percorso file sarà:
+nome_campione/deconv/file3d.tiff
+oppure
+nome_campione/deconv/stitched_stack/ <- contenente files nome_Z.tif (Z=quota)
+
+percorso_file è assoluto! sarà del tipo:
+/home/francesco/Scrivania/Google Drive/LENS/DATA/Strip/Mosaic_atriofibrillante_t1_TDE68_r1024_pw2_zf2_zs2_pmt500r_700v_TIFF3D_red/stitched_stack/
+
