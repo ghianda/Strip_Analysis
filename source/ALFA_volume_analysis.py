@@ -8,7 +8,7 @@ from skimage import exposure
 
 # local modules
 from custom_tool_kit import search_value_in_txt, seconds_to_min_sec
-from make_data import load_stack_into_numpy_ndarray, manage_path_argument
+from make_data import manage_path_argument, load_tif_data
 from custom_image_tool import normalize, save_tiff, image_have_info, create_img_name_from_index
 from custom_thresholds import opencv_th_k_means_th, make_cells_mask, widens_mask_deconv
 
@@ -73,11 +73,17 @@ def main(parser):
     z_step = parameters['res_z']  # micron
     voxel_in_micron3 = x_step * y_step * z_step  # micron^3
 
-    # extract stack
-    volume, mess = load_stack_into_numpy_ndarray([source_path])
-    img_shape = volume[:, :, 0].shape
+    # extract stack (OLD METHOD)
+    # volume, mess = load_stack_into_numpy_ndarray([source_path])
+    # img_shape = volume[:, :, 0].shape
 
-    print(mess)
+    # extract stack (NEW METHOD)---------------
+    volume = load_tif_data(source_path)
+    if len(volume.shape) == 2:
+        volume = np.expand_dims(volume, axis=2)  # add the zeta axis
+    img_shape = (volume.shape[0], volume.shape[1])
+    # ---------------------------------------------
+
     print(' Images shape : ', img_shape, '\n')
 
     # measure of imaging volume
@@ -99,6 +105,8 @@ def main(parser):
     # save elaboration time for each iteration (for estimate mean time of elaboration)
     slice_elab_time_list = list()
     t_start = time.time()
+
+    print(' EQUALIZATION and SEGMENTATION of every frame:')
 
     with open(txt_results_path, 'a') as f:
         if volume is not None:
@@ -162,7 +170,7 @@ def main(parser):
 
             # volumes in micron^3
             total_imaging_volume_in_micron = total_imaging_volume * voxel_in_micron3
-            effective_volume_in_micron = effective_myocites_volume * voxel_in_micron3
+            effective_volume_in_micron3 = effective_myocites_volume * voxel_in_micron3
 
             # in percentage
             myocites_perc = 100 * effective_myocites_volume / total_imaging_volume
@@ -173,7 +181,7 @@ def main(parser):
             result_message.append(' Number of rejected slices (because empty) on the top of Volume: {}'.format(empty_on_top))
             result_message.append(' Number of rejected slices (because empty) on the bottom of Volume: {}'.format(empty_on_bottom))
             result_message.append(' Total Imaging volume : {0:.6f} mm^3'.format(total_imaging_volume_in_micron / 10**9))
-            result_message.append(' Effective miocytes tissue volume : {0:.6f} mm^3, {1:.3f}% of Imaging volume'.format(effective_volume_in_micron / 10**9, myocites_perc))
+            result_message.append(' Effective miocytes tissue volume : {0:.6f} mm^3, {1:.3f}% of Imaging volume'.format(effective_volume_in_micron3 / 10**9, myocites_perc))
             result_message.append('\n')
             result_message.append(' OUTPUT SAVED IN: \n')
 

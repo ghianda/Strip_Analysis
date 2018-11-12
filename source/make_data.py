@@ -1,7 +1,10 @@
-import numpy as np
+import glob
 import os
-from PIL import Image
+import numpy as np
 from natsort import natsorted
+
+from skimage.external import tifffile as tif
+from PIL import Image
 
 
 def manage_path_argument(source_path):
@@ -30,6 +33,65 @@ def manage_path_argument(source_path):
         given_path = given_path[0:-1]
 
     return given_path
+
+
+def load_tif_data(source_path):
+    '''
+    Load tif file(s) in source_path into a numpy.ndarray.
+    Load either from single 3D tif file or from a directory of multipl 2d tiff frame.
+
+    :param  - source_path: path of 3d file or of directory  
+    :return: numpy.ndarray of 3d data loaded
+    '''
+    
+    if os.path.isdir(source_path):
+        print(' - Loading from directory:')
+        print(os.path.dirname(source_path), '\n')
+
+        # create a sorted list of filenames
+        flist = []
+        flist += glob.glob(os.path.join(source_path, '*.tif*'))
+        flist += glob.glob(os.path.join(source_path, '*.TIF*'))
+        flist = sorted(flist)
+
+        # open first image for check frame dimension
+        # (Huygens save like (1, 1, row, col) while ImageJ like (row, col))
+        img = tif.imread(flist[0])
+        _to_reshape = False
+        if len(img.shape) == 4:
+            img = img[0, 0, :, :]
+            _to_reshape = True
+
+        # create empty 'volume' (uint8 ndarray) 
+        volume = np.zeros((img.shape[0], img.shape[1], len(flist)), dtype=img.dtype)
+
+        # write first image inside final volume
+        volume[:, :, 0] = img
+
+        # if there are more frames than 1
+        if len(flist) > 1:
+            # read all images and add to volume
+            for (z, f) in enumerate(flist):
+                img = tif.imread(f)
+                if _to_reshape:
+                    img = img[0, 0, :, :]
+                volume[:, :, z] = img
+                print('Loaded ', os.path.basename(f))
+        volume = np.squeeze(volume)  # remove axis if dimension is 1 (es: shape[1024, 1024, 1] -> shape[1024, 1024])
+
+    else:        
+        # open tif file
+        volume = tif.imread(source_path)
+
+        if len(volume.shape) == 2:
+            print(' - Loaded 2D tiff file: {}'.format(os.path.basename(source_path)))
+
+        else:
+            volume = np.squeeze(volume.swapaxes(0, 2).swapaxes(0, 1))  # Swap axes from [z, r, c] (tif format) to [r, c, z]
+            print(' - Loaded 3D tiff file')
+
+        print('   Locate in: \n {}'.format(os.path.dirname(source_path)))  
+    return volume
 
 
 def load_stack_into_numpy_ndarray(source_path):

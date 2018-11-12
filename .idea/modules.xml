@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Strip_Analysis.iml" filepath="$PROJECT_DIR$/.idea/Strip_Analysis.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/Structural_Analysis.iml" filepath="$PROJECT_DIR$/.idea/Structural_Analysis.iml" />
     </modules>
   </component>
 </project>

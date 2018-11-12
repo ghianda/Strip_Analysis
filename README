@@ -1,14 +1,14 @@
 programma principale (3 step consecutivi):
 
- - ALFA_volume_analysis - first step (clahe, segmentation, volume estimation ecc) 
+ - ALFA_volume_analysis - first step (clahe, segmentation, saving of binary mask, segmented images, cropped ecc) 
 
- - BETA_estimated_section - use mask_bin for section estimation
-
- - GAMMA_orientation_analysis - use segmented for 3d fourier analysis
+ - GAMMA_orientation_analysis - use segmented for 3d fourier analysis and save results in R.npy
  
  
  inoltre, posso usare
  
- CLAHE - esegue il clahe sulle immagini nella cartella di origine e le salva nela destinazione fornita
+ CLAHE.py - esegue il clahe sulle immagini nella cartella di origine e le salva nela destinazione fornita
  
- segment_by_masks - fa l'AND fra le due cartelle fornite e salve i risultati in dest fornita
+ segment_by_masks.py - fa l'AND fra le due cartelle fornite e salve i risultati in dest fornita
+
+ measure_dimension.py - stima volume totale e sezione media in porzione indicata dll'utente (con riempimento buchi opzionale)

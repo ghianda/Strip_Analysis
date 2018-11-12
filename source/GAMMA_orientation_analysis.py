@@ -8,7 +8,7 @@ import time
 from scipy.ndimage.filters import gaussian_filter
 
 # custom codes
-from make_data import load_stack_into_numpy_ndarray, manage_path_argument
+from make_data import load_tif_data, manage_path_argument
 from custom_image_tool import normalize
 from custom_freq_analysis import create_3D_filter, fft_3d_to_cube, find_centroid_of_peak, filtering_3D, find_peak_in_psd
 from custom_tool_kit import pad_dimension, create_slice_coordinate, search_value_in_txt, spherical_coord, seconds_to_min_sec
@@ -27,23 +27,6 @@ def main(parser):
     args = parser.parse_args()
     source_path = manage_path_argument(args.source_folder)
 
-
-    # source_path = args.source_folder
-
-    # if type(source_path) is list:
-    #     if len(source_path) > 1:
-    #         given_path = ' '.join(source_path)
-    #         source_path = [given_path]  # prepare source_path for 'make_dataset' function (it takes a list in input)
-    #     else:
-    #         given_path = source_path[0]
-    # else:
-    #     given_path = source_path
-
-    # # remove last backlslash
-    # if given_path.endswith('/'):
-    #     given_path = given_path[0:-1]
-
-    # take base path and stack name
     base_path = os.path.dirname(os.path.dirname(source_path))
     stack_name = os.path.basename(source_path)
 
@@ -87,29 +70,24 @@ def main(parser):
     loading_mess = list()
     loading_mess.append(' ***** Start load the Stack, this may take a few minutes... ')
     
-    # extract data
-    volume, message = load_stack_into_numpy_ndarray([source_path])
-    loading_mess.append(message)
-    # source_data = make_dataset(source_path)
-    # data_length = len(source_data)
+    # extract data (OLD METHOD)
+    # volume, message = load_stack_into_numpy_ndarray([source_path])
+    # loading_mess.append(message)
 
-    # volume = create_stack_light(source_data)  # NB - this function delete source_data items and move data inside volume
-    # del source_data
-
-    # if data_length == volume.shape[2]:
-    #     print('   OK : {} slices loaded'.format(volume.shape[2]))
-    # else:
-    #     print(' *** WARNING -> len(image_list) != slices in ndarray -> check loading')
+    # extract stack (NEW METHOD)---------------
+    volume = load_tif_data(source_path)
+    if len(volume.shape) == 2:
+        volume = np.expand_dims(volume, axis=2)  # add the zeta axis
+    # ---------------------------------------------
     
     loading_mess.append(' - Volume shape : {}'.format(volume.shape))
     with open(txt_results_path, 'a') as f:
         for m in loading_mess:
-        	print(m)
-        	f.write(m + '\n')
+            print(m)
+            f.write(m + '\n')
 
     # calculate dimension
     shape_V = np.array(volume.shape)
-    pixel_for_slice = shape_V[0] * shape_V[1]
 
     """ =====================================================================================
     ________________________  -2-   CYCLE FOR BLOCKS EXTRACTION and ANALYSIS __________________"""
@@ -172,7 +150,7 @@ def main(parser):
                     for l in lines: print(l)
                     count += 1
 
-    # execuiton time
+    # execution time
     (h, m, s) = seconds_to_min_sec(time.time() - t_start)
     print('\n Iterations ended successfully \n')
 
