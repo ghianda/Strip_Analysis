@@ -8,7 +8,7 @@ python3 measure_dimension.py -sf source_folder -y1 y_start -y2 y_stop [--fill]
 con
  - source_folder : pat dello stack segmentato binario ('.../.../nome_campione/mask_bin/stitched_stack/')
  - y_start e y_stop : porzione centrale strip in cui stimare la sezione media
- --fill : opzionale, se si desidera riempire i buchi nei frame dovuti a ancata marcatura
+ --fill : opzionale, se si desidera riempire i buchi nei frame dovuti a mancata marcatura
 
   lo script produce il file 'Measure_analysis.txt' in cui riporta la sezione media e il volume stimati (oltre al report delle opzioni scelte)
 
