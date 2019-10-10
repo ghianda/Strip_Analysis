@@ -1,0 +1,8 @@
+se segnale basso, salvare la deconvoluzione a 16 bit anzichè 8 bit.
+
+Poi, aprire il file con imagej, convertirlo a 8 bit, e poi dividere tutto lo stack (Process->Math->Divide) per DUE
+salvare, e applicarci la strip_analisi
+
+(tutto ciò serve per riportare i valori al livello degli stack a 8 bit, così l'equalizzazione e la segmentaz. dovrebbero funzionare)
+
+se il clahe tira troppo su e segmenta troppo tessuto, valutare 3 cluster su 5 anziche 3 su 4 nei parameters.txt
