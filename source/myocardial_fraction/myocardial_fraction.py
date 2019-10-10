@@ -1,23 +1,3 @@
-''' Difference with original BETA function:
-1) take parameters y1 and y2 (portion of y for estimate the section mean)
-2) evaluate both original and filled section area: for the filled, fill the holes for every section and count pixel
-3) evaluate complete volume
-
-1) assicurarsi che lo stack mask_bin contenga le immagini segmentate 
-2) se si vuole salvare le sezioni segmentate, assicurarsi che in parameters.txt l'opzione 'save_binary_section' sia 1
-3) aprise lo stack 'segmented' con imagej (se serve, creare la proiezione in z con average intensity per vedere megio struttura strip) e decidere la porzione dell'asse y da analizzare (y_start e y_stop) e decidere se serve riempire i bchi (se manca marcatura) oppure no
-4) eseguire measure_dimension.py così:
-python3 measure_dimension.py -sf source_folder -y1 y_start -y2 y_stop [--fill]
-con
- - source_folder : pat dello stack segmentato binario ('.../.../nome_campione/mask_bin/stitched_stack/')
- - y_start e y_stop : porzione centrale strip in cui stimare la sezione media
- [--fill] se si vogliono riempire buchi, altrimenti nulla
-
-  lo script produce il file 'Measure_analysis.txt' in cui riporta la sezione media e il volume stimati (oltre al report delle opzioni scelte)
-'''
-
-
-
 import argparse
 import numpy as np
 import os
