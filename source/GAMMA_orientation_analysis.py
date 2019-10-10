@@ -8,10 +8,12 @@ import time
 from scipy.ndimage.filters import gaussian_filter
 
 # custom codes
-from make_data import load_tif_data, manage_path_argument
+# from make_data import load_tif_data
+from zetastitcher import InputFile
 from custom_image_tool import normalize
 from custom_freq_analysis import create_3D_filter, fft_3d_to_cube, find_centroid_of_peak, filtering_3D, find_peak_in_psd
-from custom_tool_kit import pad_dimension, create_slice_coordinate, search_value_in_txt, spherical_coord, seconds_to_min_sec
+from custom_tool_kit import pad_dimension, create_slice_coordinate, search_value_in_txt, spherical_coord, \
+    seconds_to_min_sec, manage_path_argument
 
 # --------------------------------------- end import --------------------------------------------
 
@@ -71,15 +73,17 @@ def main(parser):
     loading_mess.append(' ***** Start load the Stack, this may take a few minutes... ')
     
     # extract data (OLD METHOD)
-    # volume, message = load_stack_into_numpy_ndarray([source_path])
-    # loading_mess.append(message)
+    # volume = load_tif_data(source_path)
+    # if len(volume.shape) == 2:
+    #     volume = np.expand_dims(volume, axis=2)  # add the zeta axis
 
-    # extract stack (NEW METHOD)---------------
-    volume = load_tif_data(source_path)
-    if len(volume.shape) == 2:
-        volume = np.expand_dims(volume, axis=2)  # add the zeta axis
+    # extract stack (NEW METHOD)-------------------
+    infile = InputFile(source_path) # read virtual file (shape, dtype, ecc..)
+    volume = infile.whole() # load real images in RAM
+    # move axes from (z, y, x) -> to (r, c, z)=(y, x, z) [S.R. ZetaStitcher -> Strip Analysis]
+    volume = np.moveaxis(volume, 0, -1)
     # ---------------------------------------------
-    
+
     loading_mess.append(' - Volume shape : {}'.format(volume.shape))
     with open(txt_results_path, 'a') as f:
         for m in loading_mess:
@@ -669,12 +673,14 @@ def block_analysis(parall, shape_P, parameters, block_side, mask, verbose, lines
             center_of_cube = tuple((np.array(psd_cube_filt_blur.shape) / 2).astype(np.int32))
 
             # more precision estimation of centroid of spectrum peak
+            # centroid coord are (r,c,z) in S.R. of the cube
             centroid_coords = find_centroid_of_peak(psd_cube_filt_blur, peak_coords)
 
             # Spherical coordinates (in degree)
             (rho, phi, theta) = spherical_coord(centroid_coords, center_of_cube)
 
             # Add info to results
+            # results['peak_coord'] in the S.R. of the parall (z_coord -> z_coord - slices_pad)
             results['peak_coord'] = (centroid_coords[0],
                                      centroid_coords[1],
                                      centroid_coords[2] - slices_pad)  # real peak position in parallelogram system
