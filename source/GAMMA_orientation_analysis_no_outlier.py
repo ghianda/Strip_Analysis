@@ -207,10 +207,8 @@ def main(parser):
     post_proc_mess.append(mess)
     print(mess)
 
-    # - 3 outlier remotion based of orientation and psd_ratio values
-    R, before, after = remove_outlier(R, parameters, 'psd_ratio')
-    mess = '- 3 - Outlier Remotion based on PSD Information: removed {} outlier from {} blocks. True blocks: {}'\
-            .format(before - after, before, after)
+    # - 3 outlier remotion based of orientation and psd_ratio values - NOT EXECUTED
+    mess = '-*** NO Outlier Remotion based on PSD Information.'
     post_proc_mess.append(mess)
     print(mess)
 

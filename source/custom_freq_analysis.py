@@ -66,19 +66,17 @@ def fft_3d_to_cube(parall, num_of_slices_P, block_side):
     # 3D FFT
 
     # Spectrum creation:
-    # X and Y resolution = 0.5 um
-    # Z resolution = 2 um
-    # res(Z) / res(X,Y) = 4
-    # => parallelepiped has shape (4n, 4n, n), n = num_of_slices_P.
-    # For example: n = 8, n = 16 (Default n = 8)
-    # => Spectrum has same shape (4n, 4n, 2).
+    # due to the resolution_factor rf = (res(Z) / res(X,Y))
+    # => parallelepiped has shape (rf*n, rf*n, n), n = num_of_slices_P.
+    # For example: n = 8, rf = 4.55
+    # => Spectrum has same shape (36, 36, 8).
     # For frequency filtering, we create fake cube spectrum with
-    # [  (4n - n)/2  ] slices of (4n * 4n) zeros => slices_pad = 3n / 2
-    # [       n      ] slices of real data
-    # [  (4n - n)/2  ] slices of (4n * 4n) zeros
-    # with shape (4n, 4n, 4n)
+    # [  (36 - 8)/2  ] slices of (36 * 36) zeros => slices_pad = 3n / 2
+    # [       8      ] slices of real data
+    # [  (36 - 8)/2  ] slices of (36 * 36) zeros
+    # with shape (36, 36, 36) = (rf*n, rf*n, rf*n)
     #
-    slices_pad = int((num_of_slices_P * 3) / 2)
+    slices_pad = int((block_side - num_of_slices_P) / 2)
 
     # dimension of cube
     cube_shape = [block_side] * 3
