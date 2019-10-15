@@ -1,0 +1,70 @@
+# PARAMETRI GENERALI _________________________________
+
+# Parameters of Acquisition System:
+# Resulution (micro-meter, um)
+res_xy = 0.439
+res_z = 2
+
+
+# FASE ALFA _________________________________
+
+# soglia sulla quantità di info in un immagine
+# definita come sum(pixel)/num_pixel
+t_rate_info = 0.09
+
+# CLAHE
+# dimensione dei blocchi di equalizzazione istogramma
+clahe_ksize = 127
+# clip limit of CLAHE
+clip_clahe = 0.08
+
+# clustering
+K_cluster = 4  # num di cluster dell'istogramma
+K_true = 3  # num di cluster da includere nella segmentazione
+
+# morphological operation on binary mask
+# dimension_limit : minimum number of pixel of back holes or small white objects
+t_ratio_holes = 0.014  # definito come 100 * ( dimension_limit / num_pix_tot_of_image)
+
+# Save image or not (1 = 'yes', 0 = 'not')
+save_clahe = 1 {optional}
+save_binary_mask = 1 {necessary for section estimation}
+save_segmented = 1 {necessary for orientation analysis}
+save_contours = 1 {optional}
+save_countourned = 1 {optional} 
+
+
+
+# FASE BETA _________________________________
+
+# define parallelepiped dimension - parallelepiped: 'P'
+# (slice in z of every block of data for orientation analysis)
+num_of_slices_P = 8  
+
+# spatial Periodicity of the biological structure.
+# Example: sarcomeres, 1.8 um
+sarc_length = 1.8
+
+# convoluzione in frequenza con gaussiana con:
+sigma = 0.8
+
+# define thesholds
+threshold_on_cell_ratio = 0.8
+threshold_on_peak_ratio = 0.5
+
+# Outlier remotion from blocks that passed threshold on peak ratio
+# In the 2d space defined by (y_components, psd_ratio), the bad points are under the hyperbole and the good points above.
+# parameter for hyperbole 
+psd0_hyperbole_psd_ratio = 0.14
+k_hyperbole_psd_ratio = 0.23
+y0_hyperbole_psd_ratio = 0.1
+threshold_on_hyperbole = 0.5  # force to reject points with y_comp < 0.5 AND psd_ratio < 0.5
+
+# Dimension of grane of Local Disarray analysis inside Result Matrix
+local_disarray_xy_side = 4  # bigger the 2 (if 0, this is setted like resolution_factor * local_disarray_z_side)
+local_disarray_z_side = 2  # bigger the 2
+neighbours_lim = 3  # min num of neighbours blocks for evaluation of local_disarray value.
+isolated = 1  # 0 or 1. If cell is isolated, assign MAX_DISORDER (1) or MIN DISORDER (0)
+
+
+
