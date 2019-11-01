@@ -1,3 +1,5 @@
+# PROVA COMMIT DISARRAY LOCALE STIMATO PRODOTTO SCALARE VETTORI PER PUSH PRIMA DEL TRASFERIMENTO SU NUOVO PORTATILE
+
 # general
 import argparse
 import numpy as np
@@ -331,7 +333,7 @@ def estimate_local_disarry(R, parameters):
     shape_G = (int(grane_size_xy), int(grane_size_xy), int(grane_size_z))
     # print('shape_G', shape_G)
 
-    # iteration long each axis
+    # iteration long each axis (ceil -> upper integer)
     iterations = tuple(np.ceil(np.array(R.shape) / np.array(shape_G)).astype(np.uint32))
     print('iterations', iterations)
 
