@@ -2,6 +2,17 @@ import numpy as np
 import math
 
 
+class Bcolors:
+    VERB = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
 def pad_dimension(matrix, shape):
     ''' check if matrix have dimension like 'shape'.
     If not, pad with zero for every axis.'''
@@ -211,6 +222,17 @@ def search_value_in_txt(filepath, strings_to_search):
     return values
 
 
+def write_on_txt(strings, txt_path, _print=False, mode='a'):
+    # write the lines in 'strings' list into .txt file addressed by txt_path
+    # if _print is True, the lines is printed
+    #
+    with open(txt_path, mode=mode) as txt:
+        for s in strings:
+            txt.write(s + '\n')
+            if _print:
+                print(s)
+
+
 def all_words_in_txt(filepath):
     words = list()
     with open(filepath, 'r') as f:
@@ -226,11 +248,25 @@ def create_slice_coordinate(start_coord, shape_of_subblock):
     # that start at start_coord
     selected_slice_coord = []
     for (start, s) in zip(start_coord, shape_of_subblock):
-        selected_slice_coord.append(slice(start, start + s, 1))
+        selected_slice_coord.append(slice(start, start + s, 1))  # (start, end, step=1)
     return selected_slice_coord
 
 
-def seconds_to_min_sec(sec):
+def create_coord_by_iter(r, c, z, shape_P, _z_forced=False):
+    # create init coordinate for parallelepiped
+
+    row = r * shape_P[0]
+    col = c * shape_P[1]
+
+    if _z_forced:
+        zeta = z
+    else:
+        zeta = z * shape_P[2]
+
+    return (row, col, zeta)
+
+
+def seconds_to_hour_min_sec(sec):
     # convert seconds to (hour, minutes, seconds)
 
     if sec < 60:
@@ -238,7 +274,16 @@ def seconds_to_min_sec(sec):
     elif sec < 3600:
         return int(0), int(sec // 60), int(sec % 60)
     else:
-        return int(sec // 3600), int(sec // 60), int(sec % 60)
+        h = int(sec // 3600)
+        m = int(sec // 60) - (h * 60)
+        return h, m, int(sec % 60)
+
+
+def print_time_execution(start, end, proc_name='Process'):
+    h, m, s = seconds_to_hour_min_sec(end - start)
+    print(proc_name,'Executed in: {}h:{}m:{}s'.format(h, m, s))
+    return None
+
 
 
 

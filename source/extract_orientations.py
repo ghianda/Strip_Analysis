@@ -1,4 +1,8 @@
-# PROVA COMMIT DISARRAY LOCALE STIMATO PRODOTTO SCALARE VETTORI PER PUSH PRIMA DEL TRASFERIMENTO SU NUOVO PORTATILE
+# sono partito da GAMMA_orientation_analysis_no_outlier
+# questo script viene utilizzato nell'analisi automatica dei phantom per l'estrazione
+# delle orientazioni a partire dal campione "già segmentato"
+# HO AGGIUNTO CHE SALVA LA MATRICE DEL DISARRAY  E NE SCRIVE ANCHE LA MEDIA NEI RISULTATI
+# (PER ARTICOLO STRI CHE USA MEDIA DEL DISARRAY LOCALE)
 
 # general
 import argparse
@@ -34,22 +38,26 @@ def main(parser):
     base_path = os.path.dirname(os.path.dirname(source_path))
     stack_name = os.path.basename(source_path)
 
-    # Def parameters.txt filepath
+    # Def .txt filepath
     txt_parameters_path = os.path.join(base_path, 'parameters.txt')
+    txt_results_path = os.path.join(base_path, 'GAMMA_orientation_results.txt')
+
 
     Results_filename = 'orientation_Results.npy'
     Results_filepath = os.path.join(base_path, Results_filename)
 
     # print to video and write in results.txt init message
     init_message = [
-        ' *****************   GAMMA - Orientation analysis of 3D stack   *****************\n',
+        ' *****************   EXTRACT ORIENTATIONS - Orientation analysis of 3D stack   *****************\n'
         ' Source from path : {}'.format(source_path),
         ' Base path : {}'.format(base_path),
         ' Stack : {}'.format(stack_name),
     ]
 
-    for line in init_message:
-        print(line)
+    with open(txt_results_path, 'w') as f:
+        for line in init_message:
+            print(line)
+            f.write(line + '\n')
 
     # reads parameters
     parameters = extract_parameters(txt_parameters_path)
@@ -61,21 +69,8 @@ def main(parser):
     res_z = parameters['res_z']
     res_xy = parameters['res_xy']
     resolution_factor = res_z / res_xy
-
-    # analysis block shape
     block_side = row_P = col_P = int(num_of_slices_P * resolution_factor)
     shape_P = np.array((row_P, col_P, num_of_slices_P)).astype(np.int32)
-
-    info_message = [
-        '\n',
-        ' resolution_factor = res_z / res_xy = {}'.format(resolution_factor),
-        ' block_side = row_P = col_P = {}'.format(block_side),
-        ' shape_P = (row_P, col_P, num_of_slices_P) = ({}, {}, {})'.format(row_P, col_P, num_of_slices_P),
-        '\n\n'
-    ]
-
-    for line in info_message:
-        print(line)
 
     """ =====================================================================================
     __________________________  -1-  OPEN STACK _______________________________________________"""
@@ -96,8 +91,10 @@ def main(parser):
     # ---------------------------------------------
 
     loading_mess.append(' - Volume shape : {}'.format(volume.shape))
-    for m in loading_mess:
-        print(m)
+    with open(txt_results_path, 'a') as f:
+        for m in loading_mess:
+            print(m)
+            f.write(m + '\n')
 
     # calculate dimension
     shape_V = np.array(volume.shape)
@@ -116,51 +113,52 @@ def main(parser):
     total_iter = np.prod(shape_R)
     print('\n \n ***** Start iteration of analysis, expectd iterations : {} \n'.format(total_iter))
 
-    for z in range(shape_R[2]):
-        for r in range(shape_R[0]):
-            for c in range(shape_R[1]):
-                # initialize list of string lines
-                lines = []
+    with open(txt_results_path, 'a') as f:
+        for z in range(shape_R[2]):
+            for r in range(shape_R[0]):
+                for c in range(shape_R[1]):
+                    # initialize list of string lines
+                    lines = []
 
-                start_coord = create_coord_by_iter(r, c, z, shape_P)
-                slice_coord = create_slice_coordinate(start_coord, shape_P)
-                if verbose: lines.append('\n \n')
-                lines.append('- iter: {} - init_coord : {} - on total: {}'.format(count, start_coord, total_iter))
+                    start_coord = create_coord_by_iter(r, c, z, shape_P)
+                    slice_coord = create_slice_coordinate(start_coord, shape_P)
+                    if verbose: lines.append('\n \n')
+                    lines.append('- iter: {} - init_coord : {} - on total: {}'.format(count, start_coord, total_iter))
 
-                # save init info in R
-                R[r, c, z]['id_block'] = count
-                R[r, c, z]['init_coord'] = start_coord
+                    # save init info in R
+                    R[r, c, z]['id_block'] = count
+                    R[r, c, z]['init_coord'] = start_coord
 
-                # extract parallelepiped
-                parall = volume[slice_coord]
+                    # extract parallelepiped
+                    parall = volume[slice_coord]
 
-                # check dimension (if iteration is on border of volume, add zero_pad)
-                parall = pad_dimension(parall, shape_P)
+                    # check dimension (if iteration is on border of volume, add zero_pad)
+                    parall = pad_dimension(parall, shape_P)
 
-                if np.max(parall) != 0:
-                    parall = (normalize(parall)).astype(np.float32)  # fft analysis work with float
+                    if np.max(parall) != 0:
+                        parall = (normalize(parall)).astype(np.float32)  # fft analysis work with float
 
-                    # analysis of parallelepiped extracted
-                    there_is_cell, there_is_freq, results = block_analysis(
-                                                                            parall,
-                                                                            shape_P,
-                                                                            parameters,
-                                                                            block_side,
-                                                                            mask,
-                                                                            verbose,
-                                                                            lines)
-                    # save info in R[r, c, z]
-                    if there_is_cell: R[r, c, z]['cell_info'] = True
-                    if there_is_freq: R[r, c, z]['freq_info'] = True
+                        # analysis of parallelepiped extracted
+                        there_is_cell, there_is_freq, results = block_analysis(
+                                                                                parall,
+                                                                                shape_P,
+                                                                                parameters,
+                                                                                block_side,
+                                                                                mask,
+                                                                                verbose,
+                                                                                lines)
+                        # save info in R[r, c, z]
+                        if there_is_cell: R[r, c, z]['cell_info'] = True
+                        if there_is_freq: R[r, c, z]['freq_info'] = True
 
-                    # save results in R
-                    for key in results.keys(): R[r, c, z][key] = results[key]
+                        # save results in R
+                        for key in results.keys(): R[r, c, z][key] = results[key]
 
-                else:
-                    if verbose: lines.append('   block rejected')
+                    else:
+                        if verbose: lines.append('   block rejected')
 
-                for l in lines: print(l)
-                count += 1
+                    for l in lines: print(l)
+                    count += 1
 
     # execution time
     (h, m, s) = seconds_to_hour_min_sec(time.time() - t_start)
@@ -169,31 +167,32 @@ def main(parser):
     """ =====================================================================================
         ________________________  -3-   RESULTS ANALYSIS   __________________________________"""
 
-    end_proc_mess = list()
+    post_proc_mess = list()
 
     # count results, rejected and accepted blocks
     block_with_cell = np.count_nonzero(R['cell_info'])
     block_with_peak = np.count_nonzero(R['freq_info'])
     p_rejec_cell = 100 * (1 - block_with_cell / count)
     p_rejec_freq_tot = 100 * (1 - block_with_peak / count)
-    p_rejec_freq = 100 * (1 - block_with_peak / block_with_cell)
+    p_rejec_freq = 100 * (1 - block_with_peak / block_with_cell) if block_with_cell != 0 else 100
 
-    end_proc_mess.append('\n ***** End of iterations, time of execution: {0:2d}h {1:2d}m {2:2d}s \n'.format(int(h), int(m), int(s)))
-    end_proc_mess.append('\n - Expected iterations : {}'.format(total_iter))
-    end_proc_mess.append(' - Total iterations : {}'.format(count - 1))
-    end_proc_mess.append('\n - block with cell : {}, rejected from total: {} ({}%)'.format(block_with_cell,
+    post_proc_mess.append('\n ***** End of iterations, time of execution: {0:2d}h {1:2d}m {2:2d}s \n'.format(int(h), int(m), int(s)))
+    post_proc_mess.append('\n - Expected iterations : {}'.format(total_iter))
+    post_proc_mess.append(' - Total iterations : {}'.format(count - 1))
+    post_proc_mess.append('\n - block with cell : {}, rejected from total: {} ({}%)'.format(block_with_cell,
                                                                                                 count - block_with_cell,
                                                                                                 p_rejec_cell))
-    end_proc_mess.append(' - block with freq. info : {}'
+    post_proc_mess.append(' - block with freq. info : {}'
                            '\n    rejected from total: {} ({}%)'
                            '\n    rejected from block with cell: {} ({}%)'.format(block_with_peak,
                                                                                   count - block_with_peak,
                                                                                   p_rejec_freq_tot,
                                                                                   block_with_cell - block_with_peak,
                                                                                   p_rejec_freq))
-
-    for m in end_proc_mess:
-        print(m)
+    with open(txt_results_path, 'a') as f:
+        for m in post_proc_mess:
+            print(m)
+            f.write(m + '\n')
 
     post_proc_mess = list()
 
@@ -214,78 +213,70 @@ def main(parser):
     post_proc_mess.append(mess)
     print(mess)
 
-    # - 3 outlier remotion based of orientation and psd_ratio values
-    R, before, after = remove_outlier(R, parameters, 'psd_ratio')
-    mess = '- 3 - Outlier Remotion based on PSD Information: removed {} outlier from {} blocks. True blocks: {}'\
-            .format(before - after, before, after)
+    # - 3 outlier remotion based of orientation and psd_ratio values - NOT EXECUTED
+    mess = '-*** NO Outlier Remotion based on PSD Information.'
     post_proc_mess.append(mess)
     print(mess)
 
     # save Result matrix
     np.save(Results_filepath, R)
 
-    # - 4 Estimate local Disarray (matrix_of_disarray) and write it inside Result Matrix
-    R, matrix_of_disarray_perc, shape_LD, isolated_value = estimate_local_disarry(R, parameters)
-    mess = '- 4 - Local Disarray estimated inside result Matrix, with grane (r, c, z): ({}, {}, {})'\
-            .format(shape_LD[0], shape_LD[1], shape_LD[2])
+    # - 4 Estimate and write local disorder inside Result Matrix
+    R, shape_LD, isolated_value = estimate_local_disorder(R, parameters, resolution_factor)
+    mess = '- 4 - Local Disorder estimated inside result Matrix, with grane (r, c, z): ({}, {}, {}) ' \
+           'and isolated points setted with local_disorder = {}'\
+            .format(shape_LD[0], shape_LD[1], shape_LD[2], isolated_value)
     post_proc_mess.append(mess)
     print(mess)
 
-    # save R in a numpy file
-    # TODO- poi se funziona tutto, salvare solo questa versione di R definitiva
-    Results_filename = 'orientation_Results_disarray_rcz({},{},{}).npy'.\
-        format(shape_LD[0], shape_LD[1], shape_LD[2])
+    # se funziona tutto, salvare solo una versione di R
+    Results_filename = 'orientation_Results_after_disorder.npy'
     Results_filepath = os.path.join(base_path, Results_filename)
     np.save(Results_filepath, R)
+
+    with open(txt_results_path, 'a') as f:
+        for m in post_proc_mess:
+            f.write(m + '\n')
+    del post_proc_mess
 
     """ =====================================================================================
             ________________________  -4-   STATISTICS   __________________________________"""
 
-    stat = statistics(R, matrix_of_disarray_perc, parameters)
+    stat = statistics(R, parameters)
     result_mess = list()
     result_mess.append('\n \n *** Results of statistical analysis on accepted points: \n')
     result_mess.append(' - {0} : {1:.3f} um^(-1)'.format('Mean module', stat['Mean Module']))
     result_mess.append(' - {0} : {1:.3f} um'.format('Mean Period', stat['Mean Period']))
     result_mess.append(' - {0} : {1:.3f} % '.format('Alignment', 100 * stat['Alignment']))
-    result_mess.append(' - OLD METHOD: ')
     result_mess.append(' - {0} : {1:.3f} % '.format('XZ Dispersion (area_ratio)', 100 * stat['area_ratio']))
     result_mess.append(' - {0} : {1:.3f} % '.format('XZ Dispersion (sum dev.std)', 100 * stat['sum_std']))
-    result_mess.append(' - NEW METHOD: ')
-    result_mess.append(' - {0} : {1:.3f}% +-  {2:.3f}% '.format('Local disarray (avg +- std)',
-                                                                stat['disarray_avg'], stat['disarray_std']))
-
+    result_mess.append(' --------------------------------------------------------------------')
+    result_mess.append('------------------------------   2.0  -------------------------------')
+    result_mess.append(' - {0} : {1:.3f} um^(-1)'.format('2.0_Mean Module XZ', stat['2.0_Mean Module XZ']))
+    result_mess.append(' - {0} : {1:.3f} % '.format('2.0_area_ratio_xz ', 100 * stat['2.0_area_ratio_xz']))
+    result_mess.append(' - ')
+    result_mess.append(' - {0} : {1:.3f} um '.format('2.0_std_dev_x ', stat['2.0_std_dev_x']))
+    result_mess.append(' - {0} : {1:.3f} um '.format('2.0_std_dev_z ', stat['2.0_std_dev_z']))
+    result_mess.append(' - {0} : {1:.3f} um '.format('2.0_sum_std_xz', stat['2.0_sum_std_xz']))
+    result_mess.append(' - {0} : {1:.3f} % '.format('2.0_sum_std_xz_norm', 100 * stat['2.0_sum_std_xz_norm']))
     result_mess.append(' \n \n ***************************** END GAMMA - orientation_analysis.py ********************'
                        '\n \n \n \n ')
 
-    for l in result_mess:
-        print(l)
-
-    # save matrix_of_disarray_filename in a numpy file
-    matrix_of_disarray_filename = 'matrix_of_disarray_perc_grane_rcz({},{},{}).npy'.format(
-        shape_LD[0], shape_LD[1], shape_LD[2])
-    disarray_matrix_filepath = os.path.join(base_path, matrix_of_disarray_filename)
-    np.save(disarray_matrix_filepath, matrix_of_disarray_perc)
-
-    # create and compile txt_results file
-    txt_results_path = os.path.join(
-        base_path, 'GAMMA_orientation_results_dis_grane_rcz({},{},{})_isolated{}.txt'.format(
-            shape_LD[0], shape_LD[1], shape_LD[2], isolated_value))
-
-    all_strings = init_message + info_message + loading_mess + end_proc_mess + post_proc_mess + result_mess
-    with open(txt_results_path, 'w') as f:
-        for l in all_strings:
+    with open(txt_results_path, 'a') as f:
+        for l in result_mess:
+            print(l)
             f.write(l + '\n')
-1
+
     # -------------------------------------- end main -----------------------------------------------
 
 
-def estimate_local_disarry(R, parameters):
-    '''
-        :param R: Result matrix 'R'
-        :param parameters: dictionary of parameters read from parameters.txt
-        :return: Result matrix 'R' with 'local_disorder' value saved inside every valid cell (with freq_info == True
-        :return shape_G (dimension of grane os local disorder analysis
-        :return isolated value (value to assign at isolated points'''
+def estimate_local_disorder(R, parameters, resolution_factor):
+    ''' 
+    :param R: Result matrix 'R'
+    :param parameters: dictionary of parameters read from parameters.txt
+    :return: Result matrix 'R' with 'local_disorder' value saved inside every valid cell (with freq_info == True
+    :return shape_G (dimension of grane os local disorder analysis
+    :return isolated value (value to assign at isolated points'''
 
     """ Calculate and save inside 'local_disorder' a float value between [0, 1] if valid, or -1 if not valid (read above):
     0 : max order (all neighbour has same direction)
@@ -295,115 +286,77 @@ def estimate_local_disarry(R, parameters):
     local_disorder := module of std. deviation (3, 1) array (for every dimension (r, c, z),
     the std. dev. of peak components of neighbour)
 
-    SubBlock (Grane of analysis) dimension for std. dev. estimation have shape = shape_G = (grane_size_xy, grane_size_xy, grane_size_z)
-    with grane_size_xy and grane_size_z readed from parameters.txt file.
+    SubBlock (Grane of analysis) dimension for std. dev. estimation have shape = shape_G = (Ng_xy, Ng_xy, Ng_z)
+    with Ng_xy and Ng_z readed from parameters.txt file.
 
     Condition:
-    1) if grane_size_xy or grane_size_z < 2, function use 2.
+    1) if Ng_xy or Ng_z < 2, function use 2.
     2) if inside a SubBlock there is less than valid peak than 'lim_on_local_dispersion_eval' parameters value, local_disorder is setted to -1 (isolated block)
        for visualization, these blocks are setted with maximum local_disorder value."""
 
-    res_xy = parameters['res_xy']
-    res_z = parameters['res_z']
-    num_of_slices_P = parameters['num_of_slices_P']
-    resolution_factor = res_z / res_xy
-    block_side = int(num_of_slices_P * resolution_factor)
-
-    #       Pixel size in um^-1
-    pixel_size_F_xy = 1 / (block_side * res_xy)
-    pixel_size_F_z = 1 / (num_of_slices_P * res_z)
-
     neighbours_lim = parameters['neighbours_lim'] if parameters['neighbours_lim'] > 3 else 3
-    print('neighbours_lim', neighbours_lim)
 
     # extract analysis subblock dimension from parameters
-    grane_size_z = parameters['local_disarray_z_side'] if parameters['local_disarray_z_side'] > 2 else 2
-    grane_size_xy = parameters['local_disarray_xy_side']
+    Ng_z = parameters['local_disorder_z_side'] if parameters['local_disorder_z_side'] > 2 else 2
+    Ng_xy = parameters['local_disorder_xy_side']
 
     # check if value is valid
-    if grane_size_xy == 0:
-        grane_size_xy = grane_size_z * resolution_factor
-    elif grane_size_xy < 2:
-        grane_size_xy = 2
-
-    # print('grane_size_z', grane_size_z)
-    # print('grane_size_z', grane_size_xy)
+    if Ng_xy == 0:
+        Ng_xy = Ng_z * resolution_factor
+    elif Ng_xy < 2:
+        Ng_xy = 2
 
     # shape of grane of analysis
-    shape_G = (int(grane_size_xy), int(grane_size_xy), int(grane_size_z))
-    # print('shape_G', shape_G)
+    shape_G = (int(Ng_xy), int(Ng_xy), int(Ng_z))
 
-    # iteration long each axis (ceil -> upper integer)
+    # iteration long each axis
     iterations = tuple(np.ceil(np.array(R.shape) / np.array(shape_G)).astype(np.uint32))
-    print('iterations', iterations)
 
-    # define global matrix that contains each local disarray
-    matrix_of_disarray_perc = np.zeros(iterations).astype(np.float32)
+    # define global matrix that contains global disarray
+    matrix_of_disarray = np.zeros(iterations).astype(np.float32)
 
-    # counter
-    _i = 0
+    max_dev = min_dev = 0
 
     for z in range(iterations[2]):
         for r in range(iterations[0]):
             for c in range(iterations[1]):
-                print(_i)
-                _i += 1
 
                 # grane extraction from R
                 start_coord = create_coord_by_iter(r, c, z, shape_G)
                 slice_coord = create_slice_coordinate(start_coord, shape_G)
                 grane = R[slice_coord]
 
-                # select only blocks with valid frequency information
+                # takes only block with valid frequency information
                 f_map = grane['freq_info']
                 grane_f = grane[f_map]
 
                 # check if grane_f have at least neighbours_lim elements (default: 3)
-                if grane_f.shape[0] >= neighbours_lim:
+                if grane_f.shape[0] > neighbours_lim:
 
-                    # vector components (as a N x 3 matrix) : N = grane_f.shape[0] = number of valid blocks
-                    coord = grane_f['quiver_comp'][:, 0, :]
+                    # estraggo le componenti dei vettori picchi
+                    coord = np.vstack((grane_f['quiver_comp'][:, 0, 0],
+                                       grane_f['quiver_comp'][:, 0, 1],
+                                       grane_f['quiver_comp'][:, 0, 2]))
 
-                    # resolution: from pixel to um-1
-                    coord_um = coord * np.array([pixel_size_F_xy, pixel_size_F_xy, pixel_size_F_z])
+                    # calcolo somma in quadratura delle tre deviazione standard delle tre componenti
+                    dev_rcz = np.std(coord, axis=1)
+                    dev_tot = np.linalg.norm(dev_rcz)
 
-                    # normalize vectors (every row is a 3D vector):
-                    coord_um_norm = coord_um / np.linalg.norm(coord_um, axis=1).reshape(coord_um.shape[0], 1)
+                    # salvo in R
+                    R[slice_coord]['local_disorder'] = dev_tot  # dev_tot
 
-                    # take a random versor (for example, the first)
-                    v1 = coord_um_norm[0, :]
+                    # update maximun and minimum value finded
+                    max_dev = dev_tot if dev_tot > max_dev else max_dev
+                    min_dev = dev_tot if dev_tot < min_dev else min_dev
 
-                    # move all the vectors in the same direction of v1
-                    # (checking the positive or negative result of dot product
-                    # between the v1 and the others)
-                    for i in range(coord_um_norm.shape[0]):
-                        scalar = np.dot(v1, coord_um_norm[i])
-                        if scalar < 0:
-                            # change the direction of i-th versor
-                            coord_um_norm[i] = coord_um_norm[i] * -1
-
-                    # local alignment degree: module of the average vector
-                    alignment = np.linalg.norm(np.average(coord_um_norm, axis=0))
-
-                    # define local_disarray degree
-                    local_disarray_perc = 100 * (1 - alignment)
-
-                    # save it in each block of this portion (grane) for future statistics and plot
-                    R[slice_coord]['local_disarray'] = local_disarray_perc
-
-                    # and save it in the matrix of local_disarray
-                    matrix_of_disarray_perc[r, c, z] = local_disarray_perc
 
                 else:
-                    # there are tto few vectors in this grane
-                    R[slice_coord]['local_disarray'] = -1.  # assumption that isolated quiver have no disarray
-                    matrix_of_disarray_perc[r, c, z] = -1
-
+                    R[slice_coord]['local_disorder'] = -1.  # assumption that isolated quiver have no caos
 
     # read isolated value from parameters and normalize values inside R between 0 and 1
     isolated_value = parameters['isolated']
-    # R = normalize_local_disorder(R, max_dev, min_dev, isolated_value)
-    return R, matrix_of_disarray_perc, shape_G, isolated_value
+    R = normalize_local_disorder(R, max_dev, min_dev, isolated_value)
+    return R, shape_G, isolated_value
 
 
 def normalize_local_disorder(R, max_dev, min_dev, isolated_value):
@@ -427,19 +380,18 @@ def normalize_local_disorder(R, max_dev, min_dev, isolated_value):
     return R
 
 
-def statistics(R, matrix_of_disarray, parameters):
-    ''' From parameters, read and calculate parameters of Acquisition System
+def statistics(R, parameters):
+    ''' From parameters read and calculate parameters of Acquisition System
     ( like pixel_sizes, dimensions)
     From R take coordinates of Peaks from blocks that have frequency validation
 
-    Change coordinates of peaks (relative to center of block) and Move peaks in Y > 0 subspace
+    Change coordinates of peaks (relative to center of block) and mMove peaks in Y > 0 subspace
     (because to find peak with y>0 or peak with y<0 in spectrum is random : there are symmetrical
 
     Estimate
     - mean module of vectors -> Frequency of sarcomeres pattern
-    - mean Y components normalized between 0 and 1 ->  alignement
-    - std. deviation of X and Z components  ->  angular dispersion (disorder) on XZ plane by R
-    - mean and std of the local disarray saved in matrix_of_disarray
+    - mean Y components normalized between 0 and 1 ->  alignment
+    - std. deviation of X and Z components  ->  angular dispersion (disorder) on XZ plane
     '''
 
     stat = dict()
@@ -494,19 +446,29 @@ def statistics(R, matrix_of_disarray, parameters):
         dev[coord] = np.std(peaks_arr[:, coord])
 
     #       variance on XZ plane -> (2th and 3th axis in Image System)
-    # areas_ratio : ratio between Ellipse ( with xz axes = std.dev on x and z)
+    # areas_ratio : ratio between Ellipse ( with xz semi-axes = std.dev on x and z)
     #               and Circle with radius = mean module
+    # area ellipse = np.pi * a * b
+    # area circ    = np.pi * r**2
+    # so (area ellipse) / (area circ) = (a * b) / r**2  (va via il pi greco)
     areas_ratio = (dev[1] * dev[2]) / (mean_modules**2)
     std_dev_norm = np.sqrt(dev[1]**2 + dev[2]**2) / mean_modules
     stat['area_ratio'] = areas_ratio
     stat['sum_std'] = std_dev_norm
 
-    #       Average and STD of local disarray
-    # extract only valid values
-    disarray_valid_values = matrix_of_disarray[matrix_of_disarray != -1]
-    stat['disarray_avg'] = np.average(disarray_valid_values)
-    stat['disarray_std'] = np.std(disarray_valid_values)
-
+    # 2.0 -----------------------------------------------------------
+    # normalizzo la dev std con il modulo del vettore sul piano XZ, non con il vettore 3d!
+    modules_xz = np.sqrt(peaks_arr[:, 1] ** 2 + peaks_arr[:, 2] ** 2)
+    mean_modules_xz = np.mean(modules_xz)
+    areas_ratio_xz = (dev[1] * dev[2]) / (mean_modules_xz**2)
+    std_dev_xz = np.sqrt(dev[1]**2 + dev[2]**2)  # NO NORMALIZZATA
+    stat['2.0_Mean Module XZ'] = mean_modules_xz
+    stat['2.0_area_ratio_xz'] = areas_ratio_xz
+    stat['2.0_std_dev_x'] = dev[1]
+    stat['2.0_std_dev_z'] = dev[2]
+    stat['2.0_sum_std_xz'] = std_dev_xz
+    stat['2.0_sum_std_xz_norm'] = std_dev_xz / mean_modules_xz
+    #----------------------------------------------------------------
     return stat
 
 
@@ -559,8 +521,8 @@ def extract_parameters(filename):
                    'k_hyperbole_psd_ratio',
                    'y0_hyperbole_psd_ratio',
                    'sigma',
-                   'local_disarray_xy_side',
-                   'local_disarray_z_side',
+                   'local_disorder_xy_side',
+                   'local_disorder_z_side',
                    'neighbours_lim',
                    'isolated']
 
@@ -600,7 +562,7 @@ def create_R(shape_V, shape_P):
                    ('cell_ratio', np.float16),  # ratio between cell voxel and all voxel of block
                    ('psd_ratio', np.float32),  # ratio between sum of psd and su of filtered psd
                    ('peak_ratio', np.float16),  # ratio between value of frequency peak and spectrum integral
-                   ('local_disarray', np.float16),  # scalar product of the orientation vectors of neighbour blocks
+                   ('local_disorder', np.float16),  # std. dev. of orientation components of neighbour blocks
                    ('init_coord', np.int32, (1, 3)),  # absolute coord of voxel block[0,0,0] in Volume
                    ('peak_coord', np.float32, (1, 3)),  # relative coord to start of the block
                    ('quiver_comp', np.float32, (1, 3)),  # x,y,z component of quiver (peak coord by center of block)

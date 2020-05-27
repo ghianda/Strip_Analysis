@@ -13,7 +13,7 @@ from make_data import load_tif_data, manage_path_argument
 from custom_image_tool import normalize
 from custom_freq_analysis import create_3D_filter, fft_3d_to_cube, find_centroid_of_peak, filtering_3D, find_peak_in_psd
 from custom_tool_kit import pad_dimension, create_slice_coordinate, search_value_in_txt, spherical_coord, \
-    seconds_to_min_sec
+    seconds_to_hour_min_sec, create_coord_by_iter
 
 # --------------------------------------- end import --------------------------------------------
 
@@ -155,7 +155,7 @@ def main(parser):
                     count += 1
 
     # execution time
-    (h, m, s) = seconds_to_min_sec(time.time() - t_start)
+    (h, m, s) = seconds_to_hour_min_sec(time.time() - t_start)
     print('\n Iterations ended successfully \n')
 
     """ =====================================================================================
@@ -310,13 +310,13 @@ def estimate_local_disorder(R, parameters, resolution_factor):
 
                 # takes only block with valid frequency information
                 f_map = grane['freq_info']
-                grane_f = grane[f_map]
+                grane_f = grane[f_map]  # grane_f has shape (n, 1) where n is the number of valid blocks
 
                 # check if grane_f have at least neighbours_lim elements (default: 3)
                 if grane_f.shape[0] > neighbours_lim:
 
                     # estraggo le componenti dei vettori picchi
-                    coord = np.vstack((grane_f['quiver_comp'][:, 0, 0],
+                    coord = np.vstack((grane_f['quiver_comp'][:, 0, 0],   # [tutti i blocchi, vettore riga, comp]
                                        grane_f['quiver_comp'][:, 0, 1],
                                        grane_f['quiver_comp'][:, 0, 2]))
 
@@ -503,20 +503,6 @@ def extract_parameters(filename):
         print(' - {} : {}'.format(p_name, param_values[i]))
     print('\n \n')
     return parameters
-
-
-def create_coord_by_iter(r, c, z, shape_P, _z_forced=False):
-    # create init coordinate for parallelepiped
-    
-    row = r * shape_P[0]
-    col = c * shape_P[1]
-    
-    if _z_forced:
-        zeta = z
-    else:
-        zeta = z * shape_P[2]
-        
-    return (row, col, zeta)
 
 
 def create_R(shape_V, shape_P):

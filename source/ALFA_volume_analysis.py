@@ -7,7 +7,7 @@ import time
 from skimage import exposure
 
 # local modules
-from custom_tool_kit import search_value_in_txt, seconds_to_min_sec
+from custom_tool_kit import search_value_in_txt, seconds_to_hour_min_sec
 from make_data import manage_path_argument, load_tif_data
 from custom_image_tool import normalize, save_tiff, image_have_info, create_img_name_from_index
 from custom_thresholds import opencv_th_k_means_th, make_cells_mask, widens_mask_deconv
@@ -141,7 +141,7 @@ def main(parser):
 
                     slice_elab_time_list.append(time.time() - elab_start)            
                     elapsed_time = (number_of_slices - z - 1) * np.mean(slice_elab_time_list)
-                    (h, m, s) = seconds_to_min_sec(elapsed_time)
+                    (h, m, s) = seconds_to_hour_min_sec(elapsed_time)
                     
                     measure = ' - {0} --> {1:.1f} um^3   -   ET: {2:2d}h {3:2d}m {4:2d}s'.format(img_name,
                                                                                                  pixels_of_real_cells * voxel_in_micron3,
@@ -157,7 +157,7 @@ def main(parser):
                 f.write(measure + '\n')
 
             # execution time
-            (h, m, s) = seconds_to_min_sec(time.time() - t_start)
+            (h, m, s) = seconds_to_hour_min_sec(time.time() - t_start)
 
             # Num of saved slices
             saved = np.count_nonzero(slices_info)

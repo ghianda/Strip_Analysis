@@ -1,6 +1,7 @@
 import numpy as np
 import os
 from PIL import Image
+from io import BytesIO
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -12,6 +13,85 @@ from skimage import img_as_float
 from tifffile import imsave
 
 from custom_tool_kit import magnitude
+
+
+class ImgFrmt:
+    # image_format STRINGS
+    EPS = 'EPS'
+    TIFF = 'TIFF'
+    SVG = 'SVG'
+
+
+def plot_map_and_save(matrix, np_filename, base_path, shape_G, shape_P, img_format=ImgFrmt.TIFF, _do_norm=False):
+    """
+    # plot LOCAL disarray (or AVERAGED FA) matrix as frames
+
+    # map_name = 'FA', or 'DISARRAY_ARIT' or 'DISARRAY_WEIGH'
+    # es: plot_map_and_save(matrix_of_disarray, disarray_numpy_filename, True, IMG_TIFF)
+    # es: plot_map_and_save(matrix_of_local_FA, FA_numpy_filename, True, IMG_TIFF)
+
+    :param matrix:
+    :param np_filename:
+    :param save_plot:
+    :param img_format:
+    :param _do_norm:
+    :return:
+    """
+
+    # create folder_path and filename from numpy_filename
+    plot_folder_name = np_filename.split('.')[0]
+    plot_filebasename = '_'.join(np_filename.split('.')[0].split('_')[0:2])
+
+    # create path where save images
+    plot_path = os.path.join(base_path, plot_folder_name)
+    # check if it exist
+    if not os.path.isdir(plot_path):
+        os.mkdir(plot_path)
+
+    # iteration on the z axis
+    for i in range(0, matrix.shape[2]):
+
+        # extract data from the frame to plot
+        if _do_norm:
+            img = normalize(matrix[..., i])
+        else:
+            img = matrix[..., i]
+
+        # evaluate the depth in the volume space
+        z_frame = int((i + 0.5) * shape_G[2] * shape_P[2])
+        # create title of figure
+        title = plot_filebasename + '. Grane: ({} x {} x {}) vectors; Depth_in_frame = {}'.format(
+            int(shape_G[0]), int(shape_G[1]), int(shape_G[2]), z_frame)
+
+        # create plot
+        fig = plt.figure(figsize=(15, 15))
+        plt.imshow(img, cmap='gray')
+        plt.title(title)
+        # plt.show()
+
+        # create fname for this frame
+        fname = plot_filebasename + '_z={}'.format(z_frame)
+
+        if img_format == ImgFrmt.SVG:
+            # formato SVG -> puoi decidere dopo la risoluzione aprendolo con fiji
+            fig.savefig(str(os.path.join(plot_path, fname) + '.svg'), format='svg',
+                        dpi=1200, bbox_inches='tight', pad_inches=0)
+
+        elif img_format == ImgFrmt.EPS:
+            # formato EPS buono per latex (latex lo converte automat. in pdf)
+            fig.savefig(str(os.path.join(plot_path, fname) + '_black.eps'), format='eps', dpi=400,
+                        bbox_inches='tight', pad_inches=0)
+
+        elif img_format == ImgFrmt.TIFF:
+            png1 = BytesIO()
+            fig.savefig(png1, format='png')
+            png2 = Image.open(png1)
+            png2.save((str(os.path.join(plot_path, fname) + '.tiff')))
+            png1.close()
+
+        plt.close(fig)
+
+    return plot_path
 
 
 def save_tiff(img, img_name, comment='', folder_path='', prefix=''):
@@ -146,27 +226,67 @@ def print_info(X, text=''):
     print(' * Image mean value: {}'.format(X.mean()))
     
     
-# plot projection of external face of the cube (assial, coronal and sagitta)
-def plot_external_pojection(X, _return=False, figsize=(30, 10), global_title=''):
+# plot projection of external face of the cube (assial, coronal and sagittal)
+def plot_external_projection(X, _return=False, figsize=(30, 10), global_title=''):
     # X : numpy.ndarray
-    shape = X.shape
-    
-    side_yz = np.flipud(np.rot90(X[:,shape[1]-1,:]))
-    side_xz = np.flipud(np.rot90(X[shape[0]-1,:,:]))
-    side_xy = X[:, :, 0]
-    
+
+    # old:------------------------------------------
+    # shape = X.shape
+    # side_yz = np.flipud(np.rot90(X[:,shape[1]-1,:]))
+    # side_xz = np.flipud(np.rot90(X[shape[0]-1,:,:]))
+    # side_xy = X[:, :, 0]
+
+    # plot_n_subplots(
+    #     img_list=(side_xy, side_yz, side_xz),
+    #     sub_titles_array=['XY', 'YZ', 'XZ'],
+    #     global_title=global_title + ' - Projection of external face',
+    #     figsize=figsize,
+    #     fontsize_glbltit=30,
+    #     fontsize_subtit=30)
+    #
+    # if _return:
+    #     return side_xy, side_xz, side_yz
+    #-------------------------------------------------
+
+    # NEW (YXZ):
+    side_yx = X[..., 0]  # first plane yx
+    side_zx = np.flipud(np.rot90(X[-1, ...]))  # frontal face (bottom)
+    side_yz = np.flipud(np.rot90(X[:, -1, :]))  # side face (right)
+
     plot_n_subplots(
-        img_list=(side_xy, side_yz, side_xz),
-        sub_titles_array=['XY', 'YZ', 'XZ'],
-        global_title=global_title + ' - Projection of external face',
+        img_list=(side_yx, side_zx, side_yz),
+        sub_titles_array=['YX (Z=0)', 'ZX (Y=end)', 'YZ (X=end)'],
+        global_title=global_title + ' - Projection of external faces',
         figsize=figsize,
         fontsize_glbltit=30,
         fontsize_subtit=30)
-    
+
     if _return:
-        return side_xy, side_xz, side_yz
-    
-    
+        return side_yx, side_zx, side_yz
+
+
+def plot_central_projection(X, _return=False, figsize=(30, 10), global_title=''):
+    # X : numpy.ndarray
+    s = X.shape
+
+    # xcentral cordinates:
+    y, x, z = int(s[0]/2), int(s[1]/2), int(s[2]/2)
+    side_yx = X[..., z]
+    side_zx = np.flipud(np.rot90(X[y, ...]))
+    side_yz = np.flipud(np.rot90(X[:, x, :]))
+
+    plot_n_subplots(
+        img_list=(side_yx, side_zx, side_yz),
+        sub_titles_array=['YX (Z={})'.format(z), 'ZX (Y={})'.format(y), 'YZ (X={})'.format(x)],
+        global_title=global_title + ' - Projection of central planes',
+        figsize=figsize,
+        fontsize_glbltit=30,
+        fontsize_subtit=30)
+
+    if _return:
+        return side_yx, side_zx, side_yz
+
+
 def plot_histogram(img, title='', bins=256):
     # plot histogram
     plt.figure()
@@ -404,7 +524,7 @@ def scatter_plot_3D(points, axes_lim, title='', units=['', '', ''],
     
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    plt.axis('scaled')
+    # plt.axis('scaled')  dava errore
     
     # put points in the right subspace
     # (with selected coord > 0)

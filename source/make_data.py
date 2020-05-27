@@ -24,6 +24,8 @@ def manage_path_argument(source_path):
             given_path = ' '.join(source_path)
         else:
             given_path = source_path[0]
+    else:
+        given_path = source_path
 
     # # correct whitespace with backslash
     # given_path = given_path.replace(' ', '\ ')
@@ -43,7 +45,8 @@ def load_tif_data(source_path):
     :param  - source_path: path of 3d file or of directory  
     :return: numpy.ndarray of 3d data loaded
     '''
-    
+
+    # if source_path is directory
     if os.path.isdir(source_path):
         print(' - Loading from directory:')
         print(os.path.dirname(source_path), '\n')
@@ -54,22 +57,34 @@ def load_tif_data(source_path):
         flist += glob.glob(os.path.join(source_path, '*.TIF*'))
         flist = sorted(flist)
 
-        # open first image for check frame dimension
+        print('*************  -  ', len(flist))
+
+        # open first image (or 3d tiff file) for check frame dimension
         # (Huygens save like (1, 1, row, col) while ImageJ like (row, col))
         img = tif.imread(flist[0])
         _to_reshape = False
-        if len(img.shape) == 4:
+        if len(img.shape) >= 4:
             img = img[0, 0, :, :]
             _to_reshape = True
 
-        # create empty 'volume' (uint8 ndarray) 
-        volume = np.zeros((img.shape[0], img.shape[1], len(flist)), dtype=img.dtype)
+        if len(flist) == 1:
+            print('************  -  A')
+            # there is a single frame or a 3d tiff file
+            volume = np.copy(img)
+            # if it's a 3d tiff file, axes is z,y,x -> I want y,x,z
+            print(volume.shape)
+            volume = np.moveaxis(volume, 0, -1)
+            print(volume.shape)
 
-        # write first image inside final volume
-        volume[:, :, 0] = img
+        elif len(flist) > 1:
+            # there is a list of 2d frames
 
-        # if there are more frames than 1
-        if len(flist) > 1:
+            # create empty 'volume' (uint8 ndarray)
+            volume = np.zeros((img.shape[0], img.shape[1], len(flist)), dtype=img.dtype)
+
+            # write first image inside final volume
+            volume[:, :, 0] = img
+
             # read all images and add to volume
             for (z, f) in enumerate(flist):
                 img = tif.imread(f)
@@ -77,8 +92,10 @@ def load_tif_data(source_path):
                     img = img[0, 0, :, :]
                 volume[:, :, z] = img
                 print('Loaded ', os.path.basename(f))
+
         volume = np.squeeze(volume)  # remove axis if dimension is 1 (es: shape[1024, 1024, 1] -> shape[1024, 1024])
 
+    # if source_path is a .tiff filename
     else:        
         # open tif file
         volume = tif.imread(source_path)
