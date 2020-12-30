@@ -607,7 +607,7 @@ def main():
     par_filename = 'parameters.txt'
 
     # phantom shape (used if mask is not passed):
-    shape_phantom_manual_um = np.array([500, 250, 250]) if not _test else np.array([200, 100, 40])
+    shape_phantom_manual_um = np.array([500, 250, 250]) if not _test else np.array([430, 418, 284])
 
     # soul shape
     shape_soul_um = np.array([80, 20, 20])  # shape of 3d soul
@@ -624,7 +624,7 @@ def main():
     # centers and std dev of theta and phi distribution for virtual disarray
     mu_angles = (0, 0)  # center of the angles distributions
     if _test:
-        sigma_angles_range = [[10], [10]]
+        sigma_angles_range = [[30], [30]]
     else:
         sigma_angles_range = [range(0, 35, 5), range(0, 35, 5)]  # ok articolo (sigmaTHETA, sigmaPHI)
         sigma_angles_range = [[10], [10]]  # disarray al 3%

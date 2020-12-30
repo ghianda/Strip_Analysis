@@ -41,7 +41,7 @@ def structural_analysis(parser):
     os.system('python3 ALFA_volume_analysis.py -sf {}'.format(source_path))
 
     # call  ALFA_volume_analysis script
-    os.system('python3 GAMMA_orientation_analysis.py -sf {}'.format(segmented_path))
+    os.system('python3 GAMMA_orientation_analysis_no_outlier.py -sf {}'.format(segmented_path))
 
 
 def main():
