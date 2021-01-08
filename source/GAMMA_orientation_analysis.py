@@ -30,6 +30,7 @@ def main(parser):
     # read args from console
     args = parser.parse_args()
     source_path = manage_path_argument(args.source_folder)
+    _no_outlier_remotion = args.no_outlier_remotion  # dafault: False -> outlier remotion is executed
 
     base_path = os.path.dirname(os.path.dirname(source_path))
     stack_name = os.path.basename(source_path)
@@ -37,15 +38,13 @@ def main(parser):
     # Def parameters.txt filepath
     txt_parameters_path = os.path.join(base_path, 'parameters.txt')
 
-    Results_filename = 'orientation_Results.npy'
-    Results_filepath = os.path.join(base_path, Results_filename)
-
     # print to video and write in results.txt init message
     init_message = [
         ' *****************   GAMMA - Orientation analysis of 3D stack   *****************\n',
-        ' Source from path : {}'.format(source_path),
-        ' Base path : {}'.format(base_path),
-        ' Stack : {}'.format(stack_name),
+        ' - Source from path : {}'.format(source_path),
+        ' - Base path : {}'.format(base_path),
+        ' - Stack : {}'.format(stack_name),
+        ' - No_Outlier_Remotion : {}'.format(_no_outlier_remotion)
     ]
 
     for line in init_message:
@@ -215,62 +214,81 @@ def main(parser):
     print(mess)
 
     # - 3 outlier remotion based of orientation and psd_ratio values
-    R, before, after = remove_outlier(R, parameters, 'psd_ratio')
-    mess = '- 3 - Outlier Remotion based on PSD Information: removed {} outlier from {} blocks. True blocks: {}'\
-            .format(before - after, before, after)
+    if _no_outlier_remotion is False:
+        ''' default'''
+        R, before, after = remove_outlier(R, parameters, 'psd_ratio')
+        mess = '- 3 - Outlier Remotion based on PSD Information: removed {} outlier from {} blocks. True blocks: {}'\
+                .format(before - after, before, after)
+    else:
+        mess = '-*** NO Outlier Remotion based on PSD Information.'
     post_proc_mess.append(mess)
     print(mess)
 
-    # save Result matrix
-    np.save(Results_filepath, R)
-
     # - 4 Estimate local Disarray (matrix_of_disarray) and write it inside Result Matrix
-    R, matrix_of_disarray_perc, shape_LD, isolated_value = estimate_local_disarry(R, parameters)
+    R, matrix_of_disarray_perc, shape_LD, isolated_value = estimate_local_disarray(R, parameters)
     mess = '- 4 - Local Disarray estimated inside result Matrix, with grane (r, c, z): ({}, {}, {})'\
             .format(shape_LD[0], shape_LD[1], shape_LD[2])
     post_proc_mess.append(mess)
     print(mess)
 
-    # save R in a numpy file
-    # TODO- poi se funziona tutto, salvare solo questa versione di R definitiva
-    Results_filename = 'orientation_Results_disarray_rcz({},{},{}).npy'.\
-        format(shape_LD[0], shape_LD[1], shape_LD[2])
-    Results_filepath = os.path.join(base_path, Results_filename)
-    np.save(Results_filepath, R)
+    # - 5 Statistics and Distributions
+    stat, sarc_lengths = statistics(R, matrix_of_disarray_perc, parameters)
 
     """ =====================================================================================
-            ________________________  -4-   STATISTICS   __________________________________"""
+            ________________________  -4-    SAVE NUMPY FILES   __________________________"""
 
-    stat = statistics(R, matrix_of_disarray_perc, parameters)
+    # Prepare Filenames
+    if _no_outlier_remotion:
+        Results_filename            = 'R_gDis{}x{}x{}_nor.py'.format(shape_LD[0], shape_LD[1], shape_LD[2])
+        sarc_lengths_dist_filename  = 'sarc_lengths_distribution_nor.npy'
+        matrix_of_disarray_filename = 'matrix_of_disarray_perc_g{}x{}x{}_nor.npy'.format(shape_LD[0], shape_LD[1],
+                                                                                     shape_LD[2])
+    else:
+        Results_filename            = 'R_gDis{}x{}x{}.py'.format(shape_LD[0], shape_LD[1], shape_LD[2])
+        sarc_lengths_dist_filename  = 'sarc_lengths_distribution.npy'
+        matrix_of_disarray_filename = 'matrix_of_disarray_perc_g{}x{}x{}.npy'.format(shape_LD[0], shape_LD[1],
+                                                                                         shape_LD[2])
+
+    # prepare filepaths
+    Results_filepath           = os.path.join(base_path, Results_filename)
+    sarc_lengths_dist_filepath = os.path.join(base_path, sarc_lengths_dist_filename)
+    disarray_matrix_filepath   = os.path.join(base_path, matrix_of_disarray_filename)
+
+    # savings
+    np.save(Results_filepath, R)
+    np.save(sarc_lengths_dist_filepath, R)
+    np.save(disarray_matrix_filepath, matrix_of_disarray_perc)
+
+    """ =====================================================================================
+                ________________________  -5-    WRITE RESULTS   __________________________"""
+
     result_mess = list()
     result_mess.append('\n \n *** Results of statistical analysis on accepted points: \n')
     result_mess.append(' - {0} : {1:.3f} um^(-1)'.format('Mean module', stat['Mean Module']))
     result_mess.append(' - {0} : {1:.3f} um'.format('Mean Period', stat['Mean Period']))
     result_mess.append(' - {0} : {1:.3f} % '.format('Alignment', 100 * stat['Alignment']))
-    result_mess.append(' - OLD METHOD: ')
+    result_mess.append(' - Local Disorder (OLD METHOD): ')
     result_mess.append(' - {0} : {1:.3f} % '.format('XZ Dispersion (area_ratio)', 100 * stat['area_ratio']))
     result_mess.append(' - {0} : {1:.3f} % '.format('XZ Dispersion (sum dev.std)', 100 * stat['sum_std']))
-    result_mess.append(' - NEW METHOD: ')
+    result_mess.append(' - Local Disarray (NEW METHOD): ')
     result_mess.append(' - {0} : {1:.3f}% +-  {2:.3f}% '.format('Local disarray (avg +- std)',
                                                                 stat['disarray_avg'], stat['disarray_std']))
 
-    result_mess.append(' \n \n ***************************** END GAMMA - orientation_analysis.py ********************'
+    result_mess.append(' \n \n ***************************** '
+                       'END GAMMA - orientation_analysis.py '
+                       '********************'
                        '\n \n \n \n ')
 
+    # show results in console output
     for l in result_mess:
         print(l)
 
-    # save matrix_of_disarray_filename in a numpy file
-    matrix_of_disarray_filename = 'matrix_of_disarray_perc_grane_rcz({},{},{}).npy'.format(
-        shape_LD[0], shape_LD[1], shape_LD[2])
-    disarray_matrix_filepath = os.path.join(base_path, matrix_of_disarray_filename)
-    np.save(disarray_matrix_filepath, matrix_of_disarray_perc)
-
-    # create and compile txt_results file
+    # create txt_results filepath
     txt_results_path = os.path.join(
-        base_path, 'GAMMA_orientation_results_dis_grane_rcz({},{},{})_isolated{}.txt'.format(
+        base_path, 'GAMMA_orientation_results_with_disarr_g{}x{}x{}_isolated{}.txt'.format(
             shape_LD[0], shape_LD[1], shape_LD[2], isolated_value))
 
+    # writre results in the txt file
     all_strings = init_message + info_message + loading_mess + end_proc_mess + post_proc_mess + result_mess
     with open(txt_results_path, 'w') as f:
         for l in all_strings:
@@ -279,15 +297,15 @@ def main(parser):
     # -------------------------------------- end main -----------------------------------------------
 
 
-def estimate_local_disarry(R, parameters):
+def estimate_local_disarray(R, parameters):
     '''
         :param R: Result matrix 'R'
         :param parameters: dictionary of parameters read from parameters.txt
-        :return: Result matrix 'R' with 'local_disorder' value saved inside every valid cell (with freq_info == True
-        :return shape_G (dimension of grane os local disorder analysis
+        :return: Result matrix 'R' with 'local_disarray' value saved inside every valid cell (with freq_info == True
+        :return shape_G (dimension of grane os local disarray analysis
         :return isolated value (value to assign at isolated points'''
 
-    """ Calculate and save inside 'local_disorder' a float value between [0, 1] if valid, or -1 if not valid (read above):
+    """ Calculate and save inside 'local_disarray' a float value between [0, 1] if valid, or -1 if not valid (read above):
     0 : max order (all neighbour has same direction)
     1 : max disorder (neighbour with orthogonal direction)
     -1: too many neighbours is not valid (freq_info == False) -> block is isolated (not valid)
@@ -295,13 +313,14 @@ def estimate_local_disarry(R, parameters):
     local_disorder := module of std. deviation (3, 1) array (for every dimension (r, c, z),
     the std. dev. of peak components of neighbour)
 
-    SubBlock (Grane of analysis) dimension for std. dev. estimation have shape = shape_G = (grane_size_xy, grane_size_xy, grane_size_z)
+    SubBlock (Grane of analysis) dimension for disarray estimation have shape = shape_G = (grane_size_xy, grane_size_xy, grane_size_z)
     with grane_size_xy and grane_size_z readed from parameters.txt file.
 
     Condition:
     1) if grane_size_xy or grane_size_z < 2, function use 2.
-    2) if inside a SubBlock there is less than valid peak than 'lim_on_local_dispersion_eval' parameters value, local_disorder is setted to -1 (isolated block)
-       for visualization, these blocks are setted with maximum local_disorder value."""
+    2) if inside a SubBlock there is less than valid peak than 'lim_on_local_dispersion_eval' parameters value, 
+       local_disarray is setted to -1 (isolated block) 
+       - for visualization, these blocks are set with maximum local_disarray value."""
 
     res_xy = parameters['res_xy']
     res_z = parameters['res_z']
@@ -314,7 +333,7 @@ def estimate_local_disarry(R, parameters):
     pixel_size_F_z = 1 / (num_of_slices_P * res_z)
 
     neighbours_lim = parameters['neighbours_lim'] if parameters['neighbours_lim'] > 3 else 3
-    print('neighbours_lim', neighbours_lim)
+    # print('neighbours_lim', neighbours_lim)
 
     # extract analysis subblock dimension from parameters
     grane_size_z = parameters['local_disarray_z_side'] if parameters['local_disarray_z_side'] > 2 else 2
@@ -335,7 +354,7 @@ def estimate_local_disarry(R, parameters):
 
     # iteration long each axis (ceil -> upper integer)
     iterations = tuple(np.ceil(np.array(R.shape) / np.array(shape_G)).astype(np.uint32))
-    print('iterations', iterations)
+    # print('iterations', iterations)
 
     # define global matrix that contains each local disarray
     matrix_of_disarray_perc = np.zeros(iterations).astype(np.float32)
@@ -346,7 +365,7 @@ def estimate_local_disarry(R, parameters):
     for z in range(iterations[2]):
         for r in range(iterations[0]):
             for c in range(iterations[1]):
-                print(_i)
+                # print(_i)
                 _i += 1
 
                 # grane extraction from R
@@ -436,10 +455,14 @@ def statistics(R, matrix_of_disarray, parameters):
     (because to find peak with y>0 or peak with y<0 in spectrum is random : there are symmetrical
 
     Estimate
-    - mean module of vectors -> Frequency of sarcomeres pattern
-    - mean Y components normalized between 0 and 1 ->  alignement
+    - mean module of vectors -> Frequency of sarcomeres pattern -= (Sarc_Length)^(-1)
+    - mean Y components normalized between 0 and 1 ->  alignment
     - std. deviation of X and Z components  ->  angular dispersion (disorder) on XZ plane by R
     - mean and std of the local disarray saved in matrix_of_disarray
+
+    Returns:
+        stat: dictionary of the statistics collected
+        sarc_lenghts: array of Sarcomere Lenghts across the sample (for distribution)
     '''
 
     stat = dict()
@@ -477,23 +500,22 @@ def statistics(R, matrix_of_disarray, parameters):
     # - 3 - calculate statistics
     peaks_arr = np.array(points_subspace)
 
-    #       Directionality and modules of vectors
-    modules = np.sqrt(peaks_arr[:, 0] ** 2 + peaks_arr[:, 1] ** 2 + peaks_arr[:, 2] ** 2)
-    y_norms = peaks_arr[:, 0] / modules  # NB: in Image System, y axis is row axis (0th axis)
+    # - 3a - Directionality and modules of vectors
+    modules      = np.sqrt(peaks_arr[:, 0] ** 2 + peaks_arr[:, 1] ** 2 + peaks_arr[:, 2] ** 2)
+    sarc_lengths = 1 / modules  # array of sarcomeric lenghts in um
+    y_norms      = peaks_arr[:, 0] / modules  # NB: in Image System, y axis is row axis (0th axis)
+    # average:
+    mean_modules, mean_sarc_length, y_mean = np.mean(modules), np.mean(sarc_lengths), np.mean(y_norms)
+    stat['Alignment'] = y_mean  # adimensional [0, 1]
+    stat['Mean Module'] = mean_modules  # [um^(-1)] - freq
+    stat['Mean Period'] = mean_sarc_length  # [um] - space
 
-    mean_modules = np.mean(modules)
-    y_mean = np.mean(y_norms)
-
-    stat['Alignment'] = y_mean
-    stat['Mean Module'] = mean_modules  # [um^(-1)]
-    stat['Mean Period'] = 1 / mean_modules  # [um]
-
-    #       Standard Deviation and Disorder
+    # - 3b - Standard Deviation and Disorder
     dev = np.zeros(3)
     for coord in range(0, 3):
         dev[coord] = np.std(peaks_arr[:, coord])
 
-    #       variance on XZ plane -> (2th and 3th axis in Image System)
+    # variance on XZ plane -> (2th and 3th axis in Image System)
     # areas_ratio : ratio between Ellipse ( with xz axes = std.dev on x and z)
     #               and Circle with radius = mean module
     areas_ratio = (dev[1] * dev[2]) / (mean_modules**2)
@@ -501,13 +523,12 @@ def statistics(R, matrix_of_disarray, parameters):
     stat['area_ratio'] = areas_ratio
     stat['sum_std'] = std_dev_norm
 
-    #       Average and STD of local disarray
-    # extract only valid values
-    disarray_valid_values = matrix_of_disarray[matrix_of_disarray != -1]
+    # - 3c - Average and STD of local disarray values
+    disarray_valid_values = matrix_of_disarray[matrix_of_disarray != -1]  # extract only valid values
     stat['disarray_avg'] = np.average(disarray_valid_values)
     stat['disarray_std'] = np.std(disarray_valid_values)
 
-    return stat
+    return stat, sarc_lengths
 
 
 def mirror_in_subspace(points, subspace):
@@ -757,5 +778,10 @@ def block_analysis(parall, shape_P, parameters, block_side, mask, verbose, lines
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Analysis of orientation in 3d space of selected stack')
     parser.add_argument('-sf', '--source-folder', nargs='+', help='Images to load', required=False)
+    parser.add_argument('-nor', action='store_true', default=False, dest='no_outlier_remotion',
+                        help='Add \'-nor\' if you don\'t want to execute the outlier remotion before estimate '
+                             'statistics on R. Threshold ìs evaluated on on (Ycomp/PSDratio) with Hyperbole '
+                             'function.'
+                             'Default: False -> Outlier remotion is executed.')
     main(parser)
 
