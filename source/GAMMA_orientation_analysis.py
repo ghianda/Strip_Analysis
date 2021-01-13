@@ -284,9 +284,14 @@ def main(parser):
         print(l)
 
     # create txt_results filepath
-    txt_results_path = os.path.join(
-        base_path, 'GAMMA_orientation_results_with_disarr_g{}x{}x{}_isolated{}.txt'.format(
-            shape_LD[0], shape_LD[1], shape_LD[2], isolated_value))
+    if _no_outlier_remotion:
+        txt_results_path = os.path.join(
+            base_path, 'GAMMA_orientation_results_with_disarr_g{}x{}x{}_isolated{}_nor.txt'.format(
+                shape_LD[0], shape_LD[1], shape_LD[2], isolated_value))
+    else:
+        txt_results_path = os.path.join(
+            base_path, 'GAMMA_orientation_results_with_disarr_g{}x{}x{}_isolated{}.txt'.format(
+                shape_LD[0], shape_LD[1], shape_LD[2], isolated_value))
 
     # writre results in the txt file
     all_strings = init_message + info_message + loading_mess + end_proc_mess + post_proc_mess + result_mess

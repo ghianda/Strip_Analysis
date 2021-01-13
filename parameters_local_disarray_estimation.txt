@@ -62,7 +62,7 @@ threshold_on_hyperbole = 0.5  # force to reject points with y_comp < 0.5 AND psd
 
 # Dimension of grane of Local Disarray analysis inside Result Matrix
 local_disarray_xy_side = 4  # bigger the 2 (if 0, this is setted like resolution_factor * local_disarray_z_side)
-local_disarray_z_side = 2  # bigger the 2
+local_disarray_z_side = 4  # bigger the 2
 neighbours_lim = 3  # min num of neighbours blocks for evaluation of local_disarray value.
 isolated = 1  # 0 or 1. If cell is isolated, assign MAX_DISORDER (1) or MIN DISORDER (0)
 
