@@ -239,7 +239,7 @@ def main(parser):
 
     # Prepare Filenames
     if _no_outlier_remotion:
-        Results_filename            = 'R_gDis{}x{}x{}_nor.py'.format(shape_LD[0], shape_LD[1], shape_LD[2])
+        Results_filename            = 'R_gDis{}x{}x{}_nor.npy'.format(shape_LD[0], shape_LD[1], shape_LD[2])
         sarc_lengths_dist_filename  = 'sarc_lengths_distribution_nor.npy'
         matrix_of_disarray_filename = 'matrix_of_disarray_perc_g{}x{}x{}_nor.npy'.format(shape_LD[0], shape_LD[1],
                                                                                      shape_LD[2])
