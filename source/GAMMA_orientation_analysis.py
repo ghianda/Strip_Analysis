@@ -244,7 +244,7 @@ def main(parser):
         matrix_of_disarray_filename = 'matrix_of_disarray_perc_g{}x{}x{}_nor.npy'.format(shape_LD[0], shape_LD[1],
                                                                                      shape_LD[2])
     else:
-        Results_filename            = 'R_gDis{}x{}x{}.py'.format(shape_LD[0], shape_LD[1], shape_LD[2])
+        Results_filename            = 'R_gDis{}x{}x{}.npy'.format(shape_LD[0], shape_LD[1], shape_LD[2])
         sarc_lengths_dist_filename  = 'sarc_lengths_distribution.npy'
         matrix_of_disarray_filename = 'matrix_of_disarray_perc_g{}x{}x{}.npy'.format(shape_LD[0], shape_LD[1],
                                                                                          shape_LD[2])
