@@ -1,9 +1,15 @@
 import numpy as np
 import math
 
+# Rotations tools
+from scipy.ndimage import zoom
+from scipy.ndimage.interpolation import rotate as scipy_rotate
+from scipy.ndimage.filters import gaussian_filter1d
+
 
 class Bcolors:
     VERB = '\033[95m'
+    ROSE = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
     WARNING = '\033[93m'
@@ -11,6 +17,48 @@ class Bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
+
+def printblue(s, end='\n'):
+    print(Bcolors.OKBLUE + s + Bcolors.ENDC, end=end)
+
+
+def printgreen(s, end='\n'):
+    print(Bcolors.OKGREEN + s + Bcolors.ENDC, end=end)
+
+
+def printbold(s, end='\n'):
+    print(Bcolors.BOLD + s + Bcolors.ENDC, end=end)
+
+
+def printrose(s, end='\n'):
+    print(Bcolors.ROSE + s + Bcolors.ENDC, end=end)
+
+
+def printdict(d):
+    """
+    print a colored version of the dictionary 'd'
+    :param d: input dictionary
+    """
+    if isinstance(d, dict):
+        # for k in d.keys():
+        #     printbold('{0:5s}'.format(k), endc='')
+        #     print(' -> ', d[k])
+        for k, v in d.items():
+            printbold('{0:5s}'.format(k), endc='')
+            print(' -> ', v)
+
+
+def lists_to_dict(keys, values):
+    """ create a dictionary using the lists 'keys' and 'values'
+    :param keys: list
+    :param values: list
+    """
+    if isinstance(keys, list) and isinstance(values, list):
+        zipped = zip(keys, values)
+        return dict(zipped)
+    else:
+        return dict()
 
 
 def pad_dimension(matrix, shape):
@@ -198,14 +246,126 @@ def spherical_coord(coord, center):
     # 				z>0
     
     # find spherical coordinates
-    spherical = np.zeros(len(coord))
-    xy = relative[0]**2 + relative[1]**2
-    
-    radius = np.sqrt(xy + relative[2]**2) 
-    theta = (180 / np.pi) * np.arctan2(np.sqrt(xy), relative[2])  # theta - for elevation angle defined from Z-axis down to xy plane
-    phi = (180 / np.pi) * np.arctan2(relative[1], relative[0]) # phi
 
-    return (radius, phi, theta)
+    # NOTA BENE - era così: ----------------------- OLD
+    # xy = relative[0]**2 + relative[1]**2
+    # radius = np.sqrt(xy + relative[2]**2)
+    # theta = (180 / np.pi) * np.arctan2(np.sqrt(xy), relative[2])  # theta - for elevation angle defined from Z-axis down to xy plane
+    # phi = (180 / np.pi) * np.arctan2(relative[1], relative[0]) # phi
+    # return (radius, phi, theta)
+
+    # adesso uso direttamente: --------------------- NEW
+    return yxz_to_polar_coordinates(relative)
+
+
+def yxz_to_polar_coordinates(v):
+    # evaluate polar coordinates
+    xy = v[1]**2 + v[0]**2
+    rho = np.sqrt(xy + v[2]**2)  # radius
+    theta = (180 / np.pi) * np.arctan2(np.sqrt(xy), v[2])  # elevation angle defined from Z-axis down to xy plane
+    phi = (180 / np.pi) * np.arctan2(v[1], v[0])  # phi
+    return (rho, theta, phi)
+
+
+def apply_3d_rotations(vol, theta=0, phi=0, res_xy=1, res_z=1, mode='wrap'):
+    # apply a rotation to an isotropic version of "vol" and
+    # return the rotated volume with the original pixel size
+
+    # make vol isotropic
+    res_factor = res_z / res_xy
+    vol_isotropic = zoom(vol, (1, 1, res_factor))
+
+    # apply rotations
+    vol_iso_rot_temp = rotate_volume(vol=vol_isotropic, angle_in_deg=theta, axis=1, mode=mode)  # theta rotation
+    vol_iso_rotated = rotate_volume(vol=vol_iso_rot_temp, angle_in_deg=phi, axis=2, mode=mode)  # phi rotation
+
+    # rescale the rotated volume to the original pixel size
+    vol_rotated = zoom(vol_iso_rotated, (1, 1, 1 / res_factor))
+    return vol_rotated
+
+
+def rotate_volume(vol, angle_in_deg, axis, mode='wrap'):
+    # mode : str, optional
+    # Points outside the boundaries of the input are filled according to the given mode:
+    # {‘reflect’, ‘constant’, ‘nearest’, ‘mirror’, ‘wrap’}, optional
+
+    # select plane of rotation:
+    # around 1 axis (X)
+    if axis == 1: axes = (2, 0); angle_in_deg = -angle_in_deg  # (around X axis) - anti-coherent with theta convention
+    if axis == 2: axes = (0, 1)  # (around Z axis) - coherent with phi convention
+
+    # create rotated volume
+    rotated = scipy_rotate(input=vol, angle=angle_in_deg, axes=axes, reshape=False, output=None, mode=mode)
+    return rotated
+
+
+def sigma_from_FWHM(FWHM_um=1, px_size=1):
+    # Legend - in the "Blurring" methods:
+    # SD: Standard Deviation = sigma; Var: Variance = sigma**2
+    #
+    # a gaussian kernel with sigma = s depends by resolution (FWHM in um)
+    #
+    # This function calculates sigma (in micron) by FWHM
+    # and return sigma in pixel using the given pixel sixe.
+
+    # estimate "variance" ( = sigma**2) of gaussian kernel by FWHM
+    sigma2 = FWHM_um ** 2 / (8 * np.log(2))  # micron
+
+    # SD (= sigma) of Gaussian Kernel
+    sigma = np.sqrt(sigma2)  # micron
+
+    # return SD in pixel
+    return sigma / px_size
+
+
+def blur_on_z_axis(vol, sigma_px=1):
+    # Opera uno smoothing 1d lungo l'asse z:
+    # itera in y selezionando i piani XZ, e applica su ogni piano XZ
+    # un gaussian blur 1d lungo l'asse 1 (Z)
+    # con un kernel gaussiano di sigma = sigma_px (in pixel)
+
+    smoothed = np.zeros_like(vol)
+
+    for y in range(vol.shape[0]):
+        smoothed[y, :, :] = gaussian_filter1d(input=vol[y, :, :], sigma=sigma_px, axis=1, mode='reflect')
+
+    return smoothed
+
+
+def mirror_in_subspace(points, subspace):
+    # points: list of tuple(r,c,z), every tuple is a 3d point
+    # subspace : {integer} - [accepeted values: 0,1,2]
+    # - this refer to axes that define selected subspace:
+    # - - subspace == 0 -> all points are moved to X>0 subspace
+    # - - subspace == 1 -> all points are moved to Y>0 subspace
+    # - - subspace == 2 -> all points are moved to Z>0 subspace
+
+    if type(points) is not list:
+        points = list(points)
+
+    if subspace is not None and subspace in [0, 1, 2]:
+        # in scatter plot Y and X are inverted in Image Standard System
+        if subspace == 0:
+            mirror_ax = 1
+        elif subspace == 1:
+            mirror_ax = 0
+        else:
+            mirror_ax = 2
+
+        # move points in selected subspace
+        points_subspace = []  # list of new coordinates
+        for p in points:
+            # check values on mirror axis:
+            if p[mirror_ax] < 0:
+                points_subspace.append((-p[0], -p[1], -p[2]))
+            else:
+                points_subspace.append((p[0], p[1], p[2]))
+        return points_subspace
+
+    else:
+        # do anything
+        raise ValueError(' subspace is None or not in [0, 1, 2]')
+    return
 
 
 def search_value_in_txt(filepath, strings_to_search):
@@ -283,6 +443,17 @@ def print_time_execution(start, end, proc_name='Process'):
     h, m, s = seconds_to_hour_min_sec(end - start)
     print(proc_name,'Executed in: {}h:{}m:{}s'.format(h, m, s))
     return None
+
+
+def print_info(X, text=''):
+    if X is None:
+        return None
+    print(text)
+    print(' * Dtype: {}'.format(X.dtype))
+    print(' * Shape: {}'.format(X.shape))
+    print(' * Max value: {}'.format(X.max()))
+    print(' * Min value: {}'.format(X.min()))
+    print(' * Mean value: {}'.format(X.mean()))
 
 
 

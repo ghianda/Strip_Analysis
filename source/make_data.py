@@ -3,7 +3,7 @@ import os
 import numpy as np
 from natsort import natsorted
 
-from skimage.external import tifffile as tif
+import tifffile as tif
 from PIL import Image
 
 

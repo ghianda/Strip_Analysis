@@ -15,7 +15,7 @@ from make_data import load_tif_data, manage_path_argument
 from custom_image_tool import normalize
 from custom_freq_analysis import create_3D_filter, fft_3d_to_cube, find_centroid_of_peak, filtering_3D, find_peak_in_psd
 from custom_tool_kit import pad_dimension, create_slice_coordinate, search_value_in_txt, spherical_coord, \
-    seconds_to_hour_min_sec, create_coord_by_iter
+    seconds_to_hour_min_sec, create_coord_by_iter, mirror_in_subspace
 
 # --------------------------------------- end import --------------------------------------------
 
@@ -256,7 +256,7 @@ def main(parser):
 
     # savings
     np.save(Results_filepath, R)
-    np.save(sarc_lengths_dist_filepath, R)
+    np.save(sarc_lengths_dist_filepath, sarc_lengths)
     np.save(disarray_matrix_filepath, matrix_of_disarray_perc)
 
     """ =====================================================================================
@@ -536,41 +536,6 @@ def statistics(R, matrix_of_disarray, parameters):
     return stat, sarc_lengths
 
 
-def mirror_in_subspace(points, subspace):
-    # points: list of tuple(r,c,z), every tuple is a 3d point
-    # subspace : {integer} - [accepeted values: 0,1,2]
-    # - this refer to axes that define selected subspace:
-    # - - subspace == 0 -> all points are moved to X>0 subspace
-    # - - subspace == 1 -> all points are moved to Y>0 subspace
-    # - - subspace == 2 -> all points are moved to Z>0 subspace
-
-    if type(points) is not list:
-        points = list(points)
-
-    if subspace is not None and subspace in [0, 1, 2]:
-        # in scatter plot Y and X are inverted in Image Standard System
-        if subspace == 0:
-            mirror_ax = 1
-        elif subspace == 1:
-            mirror_ax = 0
-        else:
-            mirror_ax = 2
-
-        # move points in selected subspace
-        points_subspace = []  # list of new coordinates
-        for p in points:
-            # check values on mirror axis:
-            if p[mirror_ax] < 0:
-                points_subspace.append((-p[0], -p[1], -p[2]))
-            else:
-                points_subspace.append((p[0], p[1], p[2]))
-        return points_subspace
-
-    else:
-        # do anything
-        raise ValueError(' subspace is None or not in [0, 1, 2]')
-
-
 def extract_parameters(filename):
     ''' read parameters values in filename.txt
     and save it in a dictionary'''
@@ -621,14 +586,14 @@ def create_R(shape_V, shape_P):
         R = np.zeros(
             total_num_of_cells,
             dtype=[('id_block', np.int64),  # unique identifier of block
-                   ('cell_info', bool),  # 1 if block is analyzed, 0 if it is rejected by cell_threshold
+                   ('cell_info', bool),  # 1 if block contains tissue, 0 if it is rejected by cell_threshold
                    ('freq_info', bool),  # 1 if block contains freq. information, 0 otherwise
                    ('cell_ratio', np.float16),  # ratio between cell voxel and all voxel of block
                    ('psd_ratio', np.float32),  # ratio between sum of psd and su of filtered psd
                    ('peak_ratio', np.float16),  # ratio between value of frequency peak and spectrum integral
                    ('local_disarray', np.float16),  # scalar product of the orientation vectors of neighbour blocks
                    ('init_coord', np.int32, (1, 3)),  # absolute coord of voxel block[0,0,0] in Volume
-                   ('peak_coord', np.float32, (1, 3)),  # relative coord to start of the block
+                   ('peak_coord', np.float32, (1, 3)),  # relative coord of peak from origin of the block
                    ('quiver_comp', np.float32, (1, 3)),  # x,y,z component of quiver (peak coord by center of block)
                    ('orientation', np.float32, (1, 3)),  # (rho, phi, theta)
                    ]
