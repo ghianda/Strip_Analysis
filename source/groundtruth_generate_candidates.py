@@ -1,14 +1,13 @@
 import numpy as np
 from numpy.random import randint
 import os
-import sys
 import argparse
 import pandas as pd
-import matplotlib.pyplot as plt
 import tifffile as tiff
+import shutil
 
-from custom_tool_kit import printblue, printrose, printbold, printgreen, search_value_in_txt, \
-    printdict, lists_to_dict, print_info, yxz_to_polar_coordinates, apply_3d_rotations, sigma_from_FWHM, blur_on_z_axis
+from custom_tool_kit import printblue, printrose, printbold, printgreen, search_value_in_txt, create_directories, \
+    yxz_to_polar_coordinates, apply_3d_rotations, sigma_from_FWHM, blur_on_z_axis
 
 from GAMMA_orientation_analysis import block_analysis
 from custom_freq_analysis import create_3D_filter
@@ -45,34 +44,6 @@ def from_virtual_to_real_around(candidate, volume, shape_P, _verb=False):
     return around
 
 
-def extract_subvolume(vol, start_sub, shape_sub, _verb=False):
-    """
-    Extract from vol a subvolumes with shape 'shape_sub' located at 'start_sub'
-    S.R. YXZ
-    """
-    # # evaluate slice coordinates pointing the subvolume
-    # slice_coord = create_slice_coordinate(start_sub, shape_sub)
-    #
-    # # extract sub_volume
-    # try:
-    #     subvol = vol[slice_coord]
-    # except:
-    #     print('vol[slice_coord] -> there is some problem')
-    #     return None
-    # evaluate slice coordinates pointing the subvolume
-
-    # extract sub_volume
-    try:
-        subvol = np.copy(vol[start_sub[0] : start_sub[0] + shape_sub[0],
-                             start_sub[1] : start_sub[1] + shape_sub[1],
-                             start_sub[2] : start_sub[2] + shape_sub[2]])
-    except:
-        print('vol[slice_coord] -> there is some problem')
-        return None
-
-    return subvol
-
-
 def from_virtual_to_real_inner(candidate, volume, shape_P):
     """
     Extract a block with shape:'shape_P' pointed by 'candidate_coords' inside R, by its real_coordinates in the 'volume' (init_coord).
@@ -88,6 +59,46 @@ def from_virtual_to_real_inner(candidate, volume, shape_P):
     # extract subvolume
     inner = extract_subvolume(vol=volume, start_sub=init_coord, shape_sub=shape_P)
     return inner
+
+
+def extract_subvolume(vol, start_sub, shape_sub, _verb=False):
+    """
+    Extract from vol a subvolumes with shape 'shape_sub' located at 'start_sub'
+    S.R. YXZ
+    """
+    try:
+        subvol = np.copy(vol[start_sub[0] : start_sub[0] + shape_sub[0],
+                             start_sub[1] : start_sub[1] + shape_sub[1],
+                             start_sub[2] : start_sub[2] + shape_sub[2]])
+    except:
+        print('vol[slice_coord] -> there is some problem')
+        return None
+
+    return subvol
+
+
+def extract_inner_from_around(around, shape_P):
+    """
+    Extract a central subvolume from 'around'.
+    Subvlums has shape = shape_P
+    :param around: big volume
+    :param shape_P: shape of the subvolume to extract
+    :return: inner volume (a subvolumes with shape = shape_P) in the (3D) center of 'around' volume
+    """
+
+    if around is not None and all(around.shape > shape_P):
+
+        # inner = np.copy(around[shape_P[0] : 2 * shape_P[0],
+        #                        shape_P[1] : 2 * shape_P[1],
+        #                        shape_P[2] : 2 * shape_P[2]])
+        #
+        inner = extract_subvolume(vol=around, start_sub=shape_P, shape_sub=shape_P, _verb=False)
+        return inner
+    else:
+        printrose('There is a problem to extract inner from the around:')
+        printrose('around.shape: '), printrose(str(around.shape))
+        printrose('requested inner shape: '), printrose(shape_P)
+        return None
 
 
 def extract_orientation_vector(vol, param, _verb=False):
@@ -155,13 +166,11 @@ def extract_parameters(filename):
     # read values in txt
     param_values = search_value_in_txt(filename, param_names)
 
-    print('\n ***  Parameters : \n')
     # create dictionary of parameters
     parameters = {}
     for i, p_name in enumerate(param_names):
         parameters[p_name] = float(param_values[i])
         print(' - {} : {}'.format(p_name, param_values[i]))
-    print('\n \n')
     return parameters
 
 
@@ -229,7 +238,7 @@ def find_a_candidate(R, shape_P, _verb=False):
     max_attempts = np.prod(R.shape)
 
     # try to find a valid candidate
-    while (finded == False and attempts < max_attempts):
+    while (finded is False) and (attempts < max_attempts):
         attempts = attempts + 1
 
         # generate random index (sure with freq)
@@ -254,7 +263,11 @@ def find_a_candidate(R, shape_P, _verb=False):
 
         if is_full:
             # create the record
+            # old:
             candidate_df = pd.Series([tuple((rR, cR, zR)), attempts], index=['coords', 'attempts'])
+            # new:
+            # candidate_df = pd.DataFrame({'coord': tuple((rR, cR, zR)),
+            #                              'attempts:': attempts})
 
             # set flag True
             finded = True
@@ -284,7 +297,7 @@ def find_candidates(R, n_candidates, shape_P, _verb=True):
     :param shape_P: dimension of single block in the volume R.S.
     :param _verb: if True, function prints info to console
     :return: dataframe containing for each candidate (row):
-    - coords: (r, c, z) - coordinate in the 'R' matrix  reference system;
+    - coords: (r, c, z) - tuple of coordinate in the 'R' matrix reference system;
     - attempts: numer of attempts performed to find it
     """
 
@@ -302,7 +315,13 @@ def find_candidates(R, n_candidates, shape_P, _verb=True):
 
     # define dataframe of candidates
     candidates_df = pd.DataFrame(columns=['coords', 'attempts'])
+
+    # define index name
     candidates_df.index.name = 'id_cand'
+
+    # # set columns type (coords is set as string to avoid error when I write a tuple there)
+    # candidates_df = candidates_df.astype({'coords': str,
+    #                                       'attempts': int})
 
     # initialize research index
     while len(candidates_df) < n_candidates:
@@ -364,16 +383,6 @@ def compile_subvolumes_paths(datapath, samples_names, _in_ram=False):
     return samples_sub_paths
 
 
-def create_directories(list_of_paths):
-    """
-    for each path in 'list_of_paths', check if directories exists, otherwise create it
-    """
-    for dir in list_of_paths:
-        if not os.path.isdir(dir):
-            os.makedirs(dir)
-
-
-
 def generate_dataframe(samples_names, n_cand):
 
     # generate dataframe
@@ -387,17 +396,78 @@ def generate_dataframe(samples_names, n_cand):
     newcol, newcol_values = 'n_cand', list(range(0, n_cand))
 
     # creo nuovo dataframe di appoggio: {newcol, app}
-    temp_df = pd.DataFrame({newcol: newcol_values, 'temp': 1})
+    temp_df = pd.DataFrame({newcol: newcol_values, 'app': 1})
 
-    # combino con il dataframe esistende agganciando la colonna temp e poi rimuovendola
-    dataframe = dataframe[cols].assign(temp=1).merge(temp_df, on='temp').drop('temp', axis=1)
+    # combino con il dataframe esistende agganciando la colonna 'app' e poi rimuovendola
+    dataframe = dataframe[cols].assign(temp=1).merge(temp_df, on='app').drop('app', axis=1)
     return dataframe
 
 
-def save_dataframe(dataframe, datapath):
-    dataframe.to_excel(excel_writer=datapath)
+def save_dataframe(dataframe, dataframepath):
+
+    # save dataframe to an excel file
+    dataframe.to_excel(excel_writer=dataframepath)
+
+    # display destination path
     printblue('Dataframe saved in:')
-    print(datapath)
+    print(dataframepath)
+
+
+def copy_paste_file(frompath, topath, _in_ram=False):
+    '''
+    Copy the file 'frompath' and paste it into 'topath'.
+    If _in_ram is TRue, copy the file in /mnt/ramdisk'
+
+    :param frompath: source filepath
+    :param topath: dest filepath
+    :param _in_ram: boolean
+    :return path of file copied
+    '''
+
+    if os.path.exists(frompath):
+        if _in_ram:
+            topath = os.path.join('/mnt/ramdisk', os.path.basename(frompath))
+        else:
+            if not os.path.exists(topath):
+                printrose('ERROR - destination path not exists')
+                return None
+
+        # copy file
+        shutil.copyfile(frompath, topath)
+
+    else:
+        printrose('ERROR - Source file not found')
+
+    return topath
+
+
+
+def compile_dataframe_path(fname='noname.xlsx', fldrpath='/mnt/ram/', _in_ram=False):
+
+    # select destination
+    if _in_ram:
+        dataframepath = os.path.join('/mnt/ramdisk/', fname)
+    else:
+        dataframepath = os.path.join(os.path.dirname(fldrpath), fname)
+
+    return dataframepath
+
+
+def clean_folder(folder):
+
+    printblue('Deleting files from: ', end=''), print(folder)
+
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            # del file
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            # del subfolder
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print('Failed to delete %s. Reason: %s' % (file_path, e))
 
 
 def main(parser):
@@ -412,20 +482,32 @@ def main(parser):
     args         = parser.parse_args()
     datapath     = args.source_folder
     n_candidates = int(args.number_of_candidates)
-    n_test = int(args.number_of_test)
+    n_test       = int(args.number_of_test)
+    _ram         = bool(args.save_in_ram)
 
-    printgreen('\n****************** Groundtruth Script ******************')
-    printblue('Basepath:', end=''), print(datapath)
+    printgreen('\n******* Groundtruth Candidates Generation Script ********')
+    printblue('Basepath: ', end=''), print(datapath)
     printblue('Number of candidates for each sample: ', end=''), print(n_candidates)
     printblue('Number of test to perform for each sample: ', end=''), print(n_test)
+    printblue('Save output in ram: ', end=''), print(_ram)
 
     # generate list of paths of directories and files, and the dataframe path
     samples_paths, samples_names, R_paths, param_paths, tiff_paths = compile_paths(datapath)
-    dataframe_path = os.path.join(os.path.dirname(datapath), 'groundtruth.xlsx')
+
+    # generate path of the output dataframe
+    dataframe_path = compile_dataframe_path(fname='groundtruth.xlsx', fldrpath=datapath, _in_ram=_ram)
 
     # generate paths of results directories, an create directories if they not exists
-    samples_sub_paths = compile_subvolumes_paths(datapath, samples_names, _in_ram=True)
+    samples_sub_paths = compile_subvolumes_paths(datapath, samples_names, _in_ram=_ram)
     create_directories(samples_sub_paths)
+
+    # delete data from ram if present
+    if _ram:
+        clean_folder(folder='/mnt/ramdisk/')
+
+    # create, print, and save empty dataframe
+    dataframe = pd.DataFrame()
+    save_dataframe(dataframe, dataframe_path)
 
     # print all paths generated
     for (listname, currentlist) in zip(['Sample directories', 'R files', 'Parameters files', 'Tiff files', 'Sub Volumes'],
@@ -436,14 +518,18 @@ def main(parser):
         for (i, (sname, currentpath)) in enumerate(zip(samples_names, currentlist)):
             print('{0} - {1} - {2}'.format(i + 1, sname, currentpath))
 
-    # create, print, and save empty dataframe
-    dataframe = pd.DataFrame()
-    save_dataframe(dataframe, dataframe_path)
-
     # extract parameters from the first sample path (all samples have the same parameters)
     printblue('Loaded parameters from:')
     print(param_paths[0])
     param = extract_parameters(param_paths[0])
+
+    # generate a copy of the parameters file in the output folder
+    copied_param_filepath = copy_paste_file(frompath=param_paths[0],
+                                            topath=os.path.join(datapath, 'parameters.txt'),
+                                            _in_ram=_ram)
+    printblue('Parameters file correctly copied into:')
+    print(copied_param_filepath)
+    print()
 
     '''-- [1] --------------------------------- Start Collecting Candidates ------------------------------------'''
 
@@ -464,7 +550,7 @@ def main(parser):
         # find candidates
         candidates_df = find_candidates(R=R, n_candidates=n_candidates, shape_P=shape_P, _verb=False)
 
-        # add info
+        # add info to all the rows of the current candidates_df
         candidates_df['Sample_id'] = sname
         candidates_df['R_shape'] = '({}, {}, {})'.format(R.shape[0], R.shape[1], R.shape[2])
         candidates_df['n_cand'] = list(range(0, len(candidates_df)))
@@ -514,10 +600,8 @@ def main(parser):
         aligned = 0  # number of candidates well aligned with Y
         failed  = 0  # number of candidates discarded
 
+        # iter on the current subset (current sample) of global indexes
         for index in current_indexes:
-
-            # get index in the global dataframe
-
 
             # todo [From HERE to THERE] -> may be inside: -----------------------------------------------
             # perform_registration_to_Y_axis(....)
@@ -555,10 +639,8 @@ def main(parser):
             print('Extracted original orientation: (rho, theta, phi) = ({0:0.1f}, {1:0.1f}, {2:0.1f})'.format(
                 rho0, theta0, phi0))
 
-            # salvo orientazione originale nel dataframe
-            # row['(theta, phi) orig'] = '({0:0.1f}, {1:0.1f})'.format(theta0, phi0)
+            # save original orientation in the dataframe
             dataframe.loc[index, '(theta, phi) orig'] = '({0:0.1f}, {1:0.1f})'.format(theta0, phi0)
-
 
             # evaluate opposite rotation to apply to the 'around' volume - to align it to the Y axis
             theta_to_apply = 90 - theta0  # theta = 90 when aligned with Y axis (i.e. on the xy plane)
@@ -590,52 +672,53 @@ def main(parser):
             tiff.imsave(os.path.join(currentsubpath, '{}_cand_{}_inner_aligned.tiff'.format(sname, index)),
                         np.moveaxis(inner_aligned, -1, 0))
 
+            # evaluate orientation of inner_rotated for control (it must be (90, 0) if well aligned)
+            there_is_freq, v_align = extract_orientation_vector(vol=inner_aligned, param=param)
 
-            # todo remove - è per vedere se è coerente -----------------------
-            for n in range(3):
-                printrose('N = {}'.format(n))
+            # check if remain frequency information after the 3D rotation
+            if there_is_freq:
+                dataframe.loc[index, 'Freq after rotation'] = True
 
-                # evaluate orientation of inner_rotated for control (it must be (90, 0) if well aligned)
-                there_is_freq, v_align = extract_orientation_vector(vol=inner_aligned, param=param)
+                # polar coordinates of the new orientation
+                rho_align, theta_align, phi_align = yxz_to_polar_coordinates(v_align)
+                dataframe.loc[index, '(theta, phi) align'] = '({0:0.1f}, {1:0.1f})'.format(theta_align, phi_align)
+                # print('Orientation of aligned inner: (rho, theta, phi)   = ({0:0.1f}, {1:0.1f}, {2:0.1f})'.format(
+                #     rho_align, theta_align, phi_align))
 
-                # check if remain frequency information after the 3D rotation
-                if there_is_freq:
-                    dataframe.loc[index, 'Freq after rotation'] = True
+                # check if well aligned with Y axis
+                d_theta, d_phi = np.abs(90 - theta_align), np.abs(0 - phi_align)
+                print('Absolute distance to the Y axis: (theta, phi) = ', end='')
+                printrose('({0:0.2f}, {1:0.2f})'.format(d_theta, d_phi), end='')
+                dataframe.loc[index, 'Y distance'] = '({0:0.1f}, {1:0.1f})'.format(d_theta, d_phi)
 
-                    # polar coordinates of the new orientation
-                    rho_align, theta_align, phi_align = yxz_to_polar_coordinates(v_align)
-                    dataframe.loc[index, '(theta, phi) align'] = '({0:0.1f}, {1:0.1f})'.format(theta_align, phi_align)
-                    # print('Orientation of aligned inner: (rho, theta, phi)   = ({0:0.1f}, {1:0.1f}, {2:0.1f})'.format(
-                    #     rho_align, theta_align, phi_align))
+                if (d_theta + d_phi) < 3:
+                    dataframe.loc[index, 'Aligned'] = True
 
-                    # check if well aligned with Y axis
-                    d_theta, d_phi = np.abs(90 - theta_align), np.abs(0 - phi_align)
-                    print('Absolute distance to the Y axis: (theta, phi) = ', end='')
-                    printrose('({0:0.2f}, {1:0.2f})'.format(d_theta, d_phi), end='')
-                    dataframe.loc[index, 'Y distance'] = '({0:0.1f}, {1:0.1f})'.format(d_theta, d_phi)
+                    # save orientatoin vector in the dataframe with 5 digit decimals
+                    dataframe.loc[index, 'v_align'] = '({0:0.5f}, {1:0.5f}, {2:0.5f})'.format(
+                        v_align[0], v_align[1], v_align[2])
 
-                    if (d_theta + d_phi) < 5:
-                        dataframe.loc[index, 'Aligned'] = True
+                    # save well aligned inner for the next step (performance evaluations)
+                    inner_path = os.path.join(currentsubpath, '{}_cand_{}_inner_aligned.tiff'.format(sname, index))
+                    tiff.imsave(inner_path, np.moveaxis(inner_aligned, -1, 0))
 
-                        # save well aligned inner for the next step (performance evaluations)
-                        tiff.imsave(os.path.join(currentsubpath, '{}_cand_{}_inner_aligned.tiff'.format(sname, index)),
-                                    np.moveaxis(inner_aligned, -1, 0))
+                    # add inner path to the dataframe
+                    dataframe.loc[index, 'inner_path'] = inner_path
 
-                        # increment counter
-                        aligned = aligned + 1
-                        printbold(' -----> saved')
-                    else:
-                        dataframe.loc[index, 'Aligned'] = False
-                        printbold(' ----------------> discard')
-                        failed = failed + 1
-
+                    # increment counter
+                    aligned = aligned + 1
+                    printbold(' -----> saved')
                 else:
-                    row['Freq after rotation'] = False
-                    row['Aligned'] = False
-                    print('No frequency information after the 3D rotation. ', end='')
+                    dataframe.loc[index, 'Aligned'] = False
                     printbold(' ----------------> discard')
                     failed = failed + 1
-                # todo rimuovere for fino a qui ----------------------------
+
+            else:
+                row['Freq after rotation'] = False
+                row['Aligned'] = False
+                print('No frequency information after the 3D rotation. ', end='')
+                printbold(' ----------------> discard')
+                failed = failed + 1
 
             # increment counter of checked blocks
             checked = checked + 1
@@ -644,20 +727,16 @@ def main(parser):
             print('Finded {} block on {} until now.'.format(aligned, n_test))
             if aligned >= n_test:
                 break
-            # TODO - THERE -------------------------------------------------------------------------------
+            # TODO - THERE ------------------------------------------------------------------------------
 
             # end iteration on current sample
-            # dataframe[dataframe['Sample_id'] == sname]['checked'] = checked
-            # dataframe[dataframe['Sample_id'] == sname]['Failed'] = failed
 
+            # write performance on dataframe
             dataframe.loc[current_indexes, 'checked'] = checked
             dataframe.loc[current_indexes, 'failed']  = failed
 
-        print('Discarded {} su {}'.format(failed, checked))
+        printrose('Discarded {} su {}'.format(failed, checked))
         # end iteration on samples
-
-
-
 
     # save dataframe in the excel file
     save_dataframe(dataframe, dataframe_path)
@@ -673,54 +752,33 @@ def main(parser):
     
     il ciclo itera sugli indici, così posso scrivere nel dataframe in tempo reale all'inidce corrente
     
-    1) togliere for loop n=123 (era per vedere se l'orientazione la trova coerente) -> quello è ok
     2) aprire il file excel in
     /home/francesco/LENS/Strip/data/groundtruth/developing_on_two_samples
     crea nuove colonne
     
     una volta capio se posso andare avanti, devo fare la seconda parte dello script che legge:
     - dataframe -> estraendo solo righe con 'aligned' == 1
-    - subvolumes -> pescado i blocchi corrispendenti alla riga (vedi sopra)
+    - subvolumes -> pescado i blocchi corrispondenti alla riga (vedi sopra)
     
     e per ogni cubetto  applica performance e collezione gli errori
     per ogni cubetto -> salva le matrici di errori
     poi farò script che carica tutto insieme come dataframe o numpy array (vediamo, forse meglio numpy per il 3d)->
     e poi con jupyter creare le heatmap ecc
+    
+    io usavo:
+    JupyterProjects/Strip/accuracy_orientation/single_block/single_block_analysis_accuracy_STRIP_heatmaps_articolo_BOCCHI.ipynb
+    
+    -> adesso sviluppo seconda fase in :
+    groundtruth_evaluate_accuracy.py 
     '''
 
     printgreen('****************** Finish Groundtruth Script  ******************')
     return
 
 
-def extract_inner_from_around(around, shape_P):
-    """
-    Extract a central subvolume from 'around'.
-    Subvlums has shape = shape_P
-    :param around: big volume
-    :param shape_P: shape of the subvolume to extract
-    :return: inner volume
-    """
-
-    if around is not None and all(around.shape > shape_P):
-        inner = np.copy(around[shape_P[0] : 2 * shape_P[0],
-                               shape_P[1] : 2 * shape_P[1],
-                               shape_P[2] : 2 * shape_P[2]])
-        return inner
-    else:
-        printrose('There is a problem to extract inner from the around:')
-        printrose('around.shape: '), printrose(str(around.shape))
-        printrose('requested inner shape: '), printrose(shape_P)
-        return None
-
-
-
-
-
-
-
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Analyze performance on orientation estimation over random portion of samples.')
+    parser = argparse.ArgumentParser(description='Generate subvolumes candidates (random portion of samples aligend with Y axis) '
+                                                 'for the analysis of accuracy on orientation estimation.')
     parser.add_argument('-sf', '--source-folder', help='basepath of samples data', required=True)
     parser.add_argument('-nc', '--number-of-candidates',
                         help='For each sample, Number of blocks extracted and prepared (aligned to Y-axis) '
@@ -729,5 +787,6 @@ if __name__ == '__main__':
     parser.add_argument('-nt', '--number-of-test',
                         help='For each sample, number of blocks actually tested (Default: 50)',
                         default=20, required=False)
-
+    parser.add_argument('-ram', '--save-in-ram', default=False, action='store_true',
+                        help='if passed, script save subvolumes in /ramdisk, otherwise in the input folder')
     main(parser)

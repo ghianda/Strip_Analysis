@@ -1,10 +1,12 @@
 import numpy as np
 import math
+import os
 
 # Rotations tools
 from scipy.ndimage import zoom
 from scipy.ndimage.interpolation import rotate as scipy_rotate
 from scipy.ndimage.filters import gaussian_filter1d
+from scipy.spatial.transform import Rotation
 
 
 class Bcolors:
@@ -454,6 +456,39 @@ def print_info(X, text=''):
     print(' * Max value: {}'.format(X.max()))
     print(' * Min value: {}'.format(X.min()))
     print(' * Mean value: {}'.format(X.mean()))
+
+
+# define rotation of angle_zr around z axis:
+def create_rotation_matrix(angle_in_deg, axis):
+    # conversion in radians
+    rad = angle_in_deg * np.pi / 180
+
+    if axis in [1, 2]:
+
+        # around 1 axis (X)
+        if axis == 1:
+            rot = Rotation.from_matrix([[np.cos(rad), 0, np.sin(rad)],
+                                 [0, 1, 0],
+                                 [-np.sin(rad), 0, np.cos(rad)]])
+
+        # around 2 axis (Z)
+        if axis == 2:
+            rot = Rotation.from_matrix([[np.cos(rad), -np.sin(rad), 0],
+                                 [np.sin(rad), np.cos(rad), 0],
+                                 [0, 0, 1]])
+
+        return rot
+    else:
+        return None
+
+
+def create_directories(list_of_paths):
+    """
+    for each path in 'list_of_paths', check if directories exists, otherwise create it
+    """
+    for dir in list_of_paths:
+        if not os.path.isdir(dir):
+            os.makedirs(dir)
 
 
 
