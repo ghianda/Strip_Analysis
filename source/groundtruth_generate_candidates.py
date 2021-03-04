@@ -152,7 +152,7 @@ def get_shape_P(param):
     return shape_P
 
 
-def extract_parameters(filename):
+def extract_parameters(filename, _display=True):
     ''' read parameters values in filename.txt
     and save it in a dictionary'''
 
@@ -170,7 +170,7 @@ def extract_parameters(filename):
     parameters = {}
     for i, p_name in enumerate(param_names):
         parameters[p_name] = float(param_values[i])
-        print(' - {} : {}'.format(p_name, param_values[i]))
+        if _display: print(' - {} : {}'.format(p_name, param_values[i]))
     return parameters
 
 

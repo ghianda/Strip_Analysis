@@ -48,11 +48,11 @@ settings['_save_numpys']   = False
 settings['_display_plot']  = False
 settings['_save_plot']     = False  # vectors plot!!
 settings['plt_folder']     = 'vectors_plots'  # it will be automatically created
-settings['_save_heatmap']  = True
-settings['maps_folder']    = 'error_maps_smooth'
+settings['_save_heatmap']  = False
+settings['maps_folder']    = 'error_maps_no_smooth'
 settings['_save_tiffs']    = False
 settings['tiff_folder']    = 'block_rotated'
 
-settings['_save_lin_plot']     = True
-settings['theta_lineplt_name'] = 'theta_estimation_no_smooth.pdf'
-settings['capabiliy_plt_name'] = 'resolution_capability_no_smooth.pdf'
+# settings['_save_lin_plot']     = True
+# settings['theta_lineplt_name'] = 'theta_estimation_no_smooth.pdf'
+# settings['capabiliy_plt_name'] = 'resolution_capability_no_smooth.pdf'

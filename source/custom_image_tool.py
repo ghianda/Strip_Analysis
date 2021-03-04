@@ -3,9 +3,13 @@ import os
 from PIL import Image
 from io import BytesIO
 
+import seaborn as sns
+from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
+                               AutoMinorLocator)
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.patches import Ellipse
+
 
 import scipy.ndimage as ndimage
 from skimage import exposure
@@ -910,3 +914,45 @@ def plot_quiver_2d(x0_c, x1_c, x0_q, x1_q, axes_label=('',''), img=None, shape=N
     
     if _return:
         return fig
+
+
+def plot_heatmap(mtrx, vmin=None, vmax=None, xticks=None, yticks=None, xlabel=None, ylabel=None, title='',
+                 k=1, _display=True, _save_plot=False, _plotpath=None, filename='', ann_size=10, fmt='.2g',
+                 cmap=None, square=False, linewidth=0.0, _colorbar=True, _ticks_float=False,
+                 _invert_row=False):
+    if _invert_row:
+        mtrx = mtrx[::-1, :]
+        yticks = yticks[::-1]
+
+    # adjust format ticks
+    if _ticks_float:
+        xticks = ['{0:0.1f}'.format(x) for x in xticks]
+        yticks = ['{0:0.1f}'.format(y) for y in yticks]
+    else:
+        xticks = ['{0:0.0f}'.format(x) for x in xticks]
+        yticks = ['{0:0.0f}'.format(y) for y in yticks]
+
+    # plot heatmap
+    ax = sns.heatmap(k * mtrx, vmin=vmin, vmax=vmax, linewidth=linewidth, annot=True, annot_kws={"size": ann_size},
+                     xticklabels=xticks, yticklabels=yticks, fmt=fmt, cmap=cmap, square=square, cbar=_colorbar)
+
+    # set labels and title
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    plt.title(title)
+
+    # get fig
+    fig = ax.get_figure()
+
+    if _display:
+        plt.show()
+
+    if _save_plot and _plotpath is not None:
+        # save figure
+        figname = os.path.join(_plotpath, filename)
+        fig.tight_layout()
+        fig.savefig(figname, bbox_inches='tight')
+
+    # close fig
+    plt.close(fig)
+    return None

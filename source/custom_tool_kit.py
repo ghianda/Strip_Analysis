@@ -458,8 +458,16 @@ def print_info(X, text=''):
     print(' * Mean value: {}'.format(X.mean()))
 
 
-# define rotation of angle_zr around z axis:
+
 def create_rotation_matrix(angle_in_deg, axis):
+    '''
+    Create a rotation matrix useful for rotate vectors (not volumes) in the 3D space along x or y axis.
+    Attention - rotation around Y axis were not considered (simmetrical geometry around Y axis)
+    :param angle_in_deg: angle of rotation
+    :param axis: axis of rotation
+    :return: scipy.spatial.transform.Rotation object
+    '''
+
     # conversion in radians
     rad = angle_in_deg * np.pi / 180
 
