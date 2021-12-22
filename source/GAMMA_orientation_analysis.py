@@ -16,6 +16,7 @@ from custom_image_tool import normalize
 from custom_freq_analysis import create_3D_filter, fft_3d_to_cube, find_centroid_of_peak, filtering_3D, find_peak_in_psd
 from custom_tool_kit import pad_dimension, create_slice_coordinate, search_value_in_txt, spherical_coord, \
     seconds_to_hour_min_sec, create_coord_by_iter, mirror_in_subspace
+from local_alignment_by_R import estimate_local_alignment
 
 # --------------------------------------- end import --------------------------------------------
 
@@ -225,14 +226,22 @@ def main(parser):
     print(mess)
 
     # - 4 Estimate local Disarray (matrix_of_disarray) and write it inside Result Matrix
-    R, matrix_of_disarray_perc, shape_LD, isolated_value = estimate_local_disarray(R, parameters)
+    R, matrix_of_disarray_perc, shape_LD, isolated_value = estimate_local_disarray(R=R, parameters=parameters)
     mess = '- 4 - Local Disarray estimated inside result Matrix, with grane (r, c, z): ({}, {}, {})'\
             .format(shape_LD[0], shape_LD[1], shape_LD[2])
     post_proc_mess.append(mess)
     print(mess)
 
-    # - 5 Statistics and Distributions
-    stat, sarc_lengths = statistics(R, matrix_of_disarray_perc, parameters)
+    # - 5 Estimate local Alignment (matrix_of_alignment)
+    # Estimate local Alignment (matrix_of_alignment) and save it in a numpy file
+    R, matrix_of_align_perc, shape_LA, isolated_value = estimate_local_alignment(R=R, parameters=parameters)
+    mess = '- 5 - Local Alignment estimated from result Matrix, with grane (r, c, z): ({}, {}, {})' \
+        .format(shape_LA[0], shape_LA[1], shape_LA[2])
+    post_proc_mess.append(mess)
+    print(mess)
+
+    # - 6 Statistics and Distributions
+    stat, sarc_lengths = statistics(R, matrix_of_disarray_perc, matrix_of_align_perc, parameters)
 
     """ =====================================================================================
             ________________________  -4-    SAVE NUMPY FILES   __________________________"""
@@ -242,22 +251,28 @@ def main(parser):
         Results_filename            = 'R_gDis{}x{}x{}_nor.npy'.format(shape_LD[0], shape_LD[1], shape_LD[2])
         sarc_lengths_dist_filename  = 'sarc_lengths_distribution_nor.npy'
         matrix_of_disarray_filename = 'matrix_of_disarray_perc_g{}x{}x{}_nor.npy'.format(shape_LD[0], shape_LD[1],
-                                                                                     shape_LD[2])
+                                                                                         shape_LD[2])
+        matrix_of_alignment_filename = 'matrix_of_alignment_perc_g{}x{}x{}_nor.npy'.format(shape_LA[0], shape_LA[1],
+                                                                                           shape_LA[2])
     else:
         Results_filename            = 'R_gDis{}x{}x{}.npy'.format(shape_LD[0], shape_LD[1], shape_LD[2])
         sarc_lengths_dist_filename  = 'sarc_lengths_distribution.npy'
         matrix_of_disarray_filename = 'matrix_of_disarray_perc_g{}x{}x{}.npy'.format(shape_LD[0], shape_LD[1],
-                                                                                         shape_LD[2])
+                                                                                     shape_LD[2])
+        matrix_of_alignment_filename = 'matrix_of_alignment_perc_g{}x{}x{}.npy'.format(shape_LA[0], shape_LA[1],
+                                                                                       shape_LA[2])
 
     # prepare filepaths
     Results_filepath           = os.path.join(base_path, Results_filename)
     sarc_lengths_dist_filepath = os.path.join(base_path, sarc_lengths_dist_filename)
     disarray_matrix_filepath   = os.path.join(base_path, matrix_of_disarray_filename)
+    alignment_matrix_filepath  = os.path.join(base_path, matrix_of_alignment_filename)
 
     # savings
     np.save(Results_filepath, R)
     np.save(sarc_lengths_dist_filepath, sarc_lengths)
     np.save(disarray_matrix_filepath, matrix_of_disarray_perc)
+    np.save(alignment_matrix_filepath, matrix_of_align_perc)
 
     """ =====================================================================================
                 ________________________  -5-    WRITE RESULTS   __________________________"""
@@ -270,10 +285,13 @@ def main(parser):
     result_mess.append(' - Local Disorder (OLD METHOD): ')
     result_mess.append(' - {0} : {1:.3f} % '.format('XZ Dispersion (area_ratio)', 100 * stat['area_ratio']))
     result_mess.append(' - {0} : {1:.3f} % '.format('XZ Dispersion (sum dev.std)', 100 * stat['sum_std']))
+    result_mess.append('\n')
     result_mess.append(' - Local Disarray (NEW METHOD): ')
     result_mess.append(' - {0} : {1:.3f}% +-  {2:.3f}% '.format('Local disarray (avg +- std)',
                                                                 stat['disarray_avg'], stat['disarray_std']))
-
+    result_mess.append(' - Local Alignment (NEW METHOD): ')
+    result_mess.append(' - {0} : {1:.3f}% +-  {2:.3f}% '.format('Local Alignment',
+                                                                stat['alignment_avg'], stat['alignment_std']))
     result_mess.append(' \n \n ***************************** '
                        'END GAMMA - orientation_analysis.py '
                        '********************'
@@ -328,38 +346,35 @@ def estimate_local_disarray(R, parameters):
        - for visualization, these blocks are set with maximum local_disarray value."""
 
     res_xy = parameters['res_xy']
-    res_z = parameters['res_z']
-    num_of_slices_P = parameters['num_of_slices_P']
+    res_z  = parameters['res_z']
+    num_of_slices_P   = parameters['num_of_slices_P']
     resolution_factor = res_z / res_xy
-    block_side = int(num_of_slices_P * resolution_factor)
+    block_side        = int(num_of_slices_P * resolution_factor)
 
     #       Pixel size in um^-1
     pixel_size_F_xy = 1 / (block_side * res_xy)
     pixel_size_F_z = 1 / (num_of_slices_P * res_z)
 
-    neighbours_lim = parameters['neighbours_lim'] if parameters['neighbours_lim'] > 3 else 3
-    # print('neighbours_lim', neighbours_lim)
-
     # extract analysis subblock dimension from parameters
-    grane_size_z = parameters['local_disarray_z_side'] if parameters['local_disarray_z_side'] > 2 else 2
+    grane_size_z = parameters['local_disarray_z_side']
     grane_size_xy = parameters['local_disarray_xy_side']
 
     # check if value is valid
     if grane_size_xy == 0:
         grane_size_xy = grane_size_z * resolution_factor
-    elif grane_size_xy < 2:
-        grane_size_xy = 2
-
-    # print('grane_size_z', grane_size_z)
-    # print('grane_size_z', grane_size_xy)
 
     # shape of grane of analysis
     shape_G = (int(grane_size_xy), int(grane_size_xy), int(grane_size_z))
-    # print('shape_G', shape_G)
+
+    # define limimt of number of vectors in the disarray macrovoxel
+    if parameters['neighbours_lim'] > 0:
+        neighbours_lim = parameters['neighbours_lim']  # manually inserted from parameters.txt
+    else:
+        neighbours_lim = np.int(np.prod(shape_G) / 2)  # auto: 50% of vectors
+    print('** Limit of number of vector inside the macrovoxel: ', neighbours_lim)
 
     # iteration long each axis (ceil -> upper integer)
     iterations = tuple(np.ceil(np.array(R.shape) / np.array(shape_G)).astype(np.uint32))
-    # print('iterations', iterations)
 
     # define global matrix that contains each local disarray
     matrix_of_disarray_perc = np.zeros(iterations).astype(np.float32)
@@ -423,7 +438,6 @@ def estimate_local_disarray(R, parameters):
                     R[slice_coord]['local_disarray'] = -1.  # assumption that isolated quiver have no disarray
                     matrix_of_disarray_perc[r, c, z] = -1
 
-
     # read isolated value from parameters and normalize values inside R between 0 and 1
     isolated_value = parameters['isolated']
     # R = normalize_local_disorder(R, max_dev, min_dev, isolated_value)
@@ -451,7 +465,7 @@ def normalize_local_disorder(R, max_dev, min_dev, isolated_value):
     return R
 
 
-def statistics(R, matrix_of_disarray, parameters):
+def statistics(R, matrix_of_disarray, matrix_of_alignment, parameters):
     ''' From parameters, read and calculate parameters of Acquisition System
     ( like pixel_sizes, dimensions)
     From R take coordinates of Peaks from blocks that have frequency validation
@@ -532,6 +546,11 @@ def statistics(R, matrix_of_disarray, parameters):
     disarray_valid_values = matrix_of_disarray[matrix_of_disarray != -1]  # extract only valid values
     stat['disarray_avg'] = np.average(disarray_valid_values)
     stat['disarray_std'] = np.std(disarray_valid_values)
+
+    # - 3d - Average and STD of local alignment values
+    align_valid_values = matrix_of_alignment[matrix_of_alignment != -1]  # extract only valid values
+    stat['alignment_avg'] = np.average(align_valid_values)
+    stat['alignment_std'] = np.std(align_valid_values)
 
     return stat, sarc_lengths
 
